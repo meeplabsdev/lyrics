@@ -1,11 +1,19 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod artist;
+mod artwork;
+mod controls;
 mod dynamic_bg;
 mod layout;
+mod lyrics;
+mod title;
 mod utils;
 
-use crate::{dynamic_bg::DynamicBg, layout::Layout, utils::PutClipped};
-use eframe::egui::{self, Align, Button, Color32, Image, Label, RichText, include_image};
+use crate::{
+    artist::Artist, artwork::Artwork, controls::Controls, dynamic_bg::DynamicBg, layout::Layout,
+    lyrics::Lyrics, title::Title, utils::PutClipped,
+};
+use eframe::egui;
 
 pub const WINDOW_SIZE: [f32; 2] = [1024.0, 600.0];
 
@@ -29,34 +37,11 @@ impl eframe::App for LyricsApp {
                 let layout = Layout::new(ui.available_rect_before_wrap());
                 ui.add(&mut self.bg);
 
-                ui.putc(
-                    layout.artwork,
-                    Image::new(include_image!("../assets/test.png")).corner_radius(4),
-                );
-
-                ui.putc(layout.controls, Button::new("hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii"));
-
-                ui.putc(
-                    layout.title,
-                    Label::new(
-                        RichText::new("Among Us Impostor")
-                            .color(Color32::WHITE)
-                    )
-                    .halign(Align::Center)
-                    .selectable(false),
-                );
-
-                ui.putc(
-                    layout.artist,
-                    Label::new(
-                        RichText::new("Real Crewmate")
-                            .color(Color32::WHITE)
-                    )
-                    .halign(Align::Center)
-                    .selectable(false),
-                );
-
-                ui.painter().rect_filled(layout.lyrics, 0, Color32::BLACK);
+                ui.putc(layout.artwork, Artwork::new());
+                ui.putc(layout.controls, Controls::new());
+                ui.putc(layout.title, Title::new());
+                ui.putc(layout.artist, Artist::new());
+                ui.putc(layout.lyrics, Lyrics::new());
             });
     }
 }

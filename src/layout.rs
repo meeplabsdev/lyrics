@@ -13,11 +13,13 @@ pub struct Layout {
 impl Layout {
     pub fn new(screen: Rect) -> Self {
         let screen_h = screen.height();
-        let center_x = screen.center().x;
-        let lyrics = Rect::everything_right_of(center_x);
-
+        let screen_w = screen.width();
+        let center_x = screen_w / 2.0;
         let artwork_scale = screen.width() / 3.2;
         let artwork_offset = (center_x - artwork_scale) / 2.0;
+
+        let lyrics = Rect::from_min_max(Pos2::new(center_x, 0.0), Pos2::new(screen_w, screen_h));
+
         let artwork = Rect::from_min_size(
             Pos2::new(artwork_offset, artwork_offset),
             Vec2::new(artwork_scale, artwork_scale),
