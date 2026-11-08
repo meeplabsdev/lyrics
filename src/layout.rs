@@ -27,17 +27,17 @@ impl Layout {
 
         let controls = Rect::from_min_size(
             artwork.left_bottom() + Vec2::new(4.0, 8.0),
-            Vec2::new(artwork.width() - 8.0, screen_h / 19.0),
+            Vec2::new(artwork.width() - 8.0, screen_h / 25.0),
         );
 
         let title = Rect::from_min_size(
             controls.left_bottom() + Vec2::new(8.0, 4.0),
-            Vec2::new(controls.width(), screen_h / 25.0),
+            Vec2::new(controls.width() - 16.0, screen_h / 20.0),
         );
 
         let artist = Rect::from_min_size(
             controls.left_bottom() + Vec2::new(8.0, title.height() + 4.0),
-            Vec2::new(controls.width(), screen_h / 35.0),
+            Vec2::new(controls.width() - 16.0, screen_h / 30.0),
         );
 
         Self {

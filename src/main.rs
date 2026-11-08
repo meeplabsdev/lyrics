@@ -13,18 +13,34 @@ use crate::{
     artist::Artist, artwork::Artwork, controls::Controls, dynamic_bg::DynamicBg, layout::Layout,
     lyrics::Lyrics, title::Title, utils::PutClipped,
 };
-use eframe::egui;
+use anyhow::{Context, Result};
+use eframe::{
+    egui::{self, FontData, FontFamily},
+    epaint::text::{FontInsert, FontPriority, InsertFontFamily},
+};
 
 pub const WINDOW_SIZE: [f32; 2] = [1024.0, 600.0];
 
 struct LyricsApp {
     bg: DynamicBg,
+    controls: Controls,
+    artwork: Artwork,
+    lyrics: Lyrics,
+    title: Title,
+    artist: Artist,
 }
 
 impl LyricsApp {
-    fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
-        Some(Self {
-            bg: DynamicBg::new(cc)?,
+    fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Result<Self> {
+        Ok(Self {
+            bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
+            controls: Controls::new(),
+            artwork: Artwork::new(
+                "https://i.scdn.co/image/ab67616d0000b273850e59c887aec05f031c022d".into(),
+            ),
+            lyrics: Lyrics::new(),
+            title: Title::new("Please Let Me Wonder".into()),
+            artist: Artist::new(1965, "The Beach Boys".into()),
         })
     }
 }
@@ -37,11 +53,11 @@ impl eframe::App for LyricsApp {
                 let layout = Layout::new(ui.available_rect_before_wrap());
                 ui.add(&mut self.bg);
 
-                ui.putc(layout.artwork, Artwork::new());
-                ui.putc(layout.controls, Controls::new());
-                ui.putc(layout.title, Title::new());
-                ui.putc(layout.artist, Artist::new());
-                ui.putc(layout.lyrics, Lyrics::new());
+                ui.putc(layout.artwork, &mut self.artwork);
+                ui.putc(layout.controls, &mut self.controls);
+                ui.putc(layout.title, &mut self.title);
+                ui.putc(layout.artist, &mut self.artist);
+                ui.putc(layout.lyrics, &mut self.lyrics);
             });
     }
 }
@@ -62,7 +78,43 @@ fn main() -> eframe::Result {
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            Ok(Box::new(LyricsApp::new(cc).ok_or("err")?))
+            cc.egui_ctx.add_font(FontInsert::new(
+                "lyricsregular",
+                FontData::from_static(include_bytes!("../assets/LyricsRegular.ttf")),
+                vec![InsertFontFamily {
+                    family: FontFamily::Name("lyricsregular".into()),
+                    priority: FontPriority::Highest,
+                }],
+            ));
+
+            cc.egui_ctx.add_font(FontInsert::new(
+                "lyricsmedium",
+                FontData::from_static(include_bytes!("../assets/LyricsMedium.ttf")),
+                vec![InsertFontFamily {
+                    family: FontFamily::Name("lyricsmedium".into()),
+                    priority: FontPriority::Highest,
+                }],
+            ));
+
+            cc.egui_ctx.add_font(FontInsert::new(
+                "lyricssemibold",
+                FontData::from_static(include_bytes!("../assets/LyricsSemibold.ttf")),
+                vec![InsertFontFamily {
+                    family: FontFamily::Name("lyricssemibold".into()),
+                    priority: FontPriority::Highest,
+                }],
+            ));
+
+            cc.egui_ctx.add_font(FontInsert::new(
+                "lyricsbold",
+                FontData::from_static(include_bytes!("../assets/LyricsBold.ttf")),
+                vec![InsertFontFamily {
+                    family: FontFamily::Name("lyricsbold".into()),
+                    priority: FontPriority::Highest,
+                }],
+            ));
+
+            Ok(Box::new(LyricsApp::new(cc)?))
         }),
     )
 }

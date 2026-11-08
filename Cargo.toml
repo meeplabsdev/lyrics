@@ -6,7 +6,11 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.104"
 bytemuck = "1.25.2"
+color-thief = "0.2.2"
 eframe = "0.35.0"
-egui_extras = { version = "0.35.0", features = ["image"] }
+egui_extras = { version = "0.35.0", features = ["all_loaders"] }
+image = { version = "0.25.10" }
 paris = { version = "1.5.15", features = ["macros", "timestamps"] }
-reqwest = { version = "0.13.5", features = ["brotli", "deflate", "form", "gzip", "json", "multipart", "query", "stream", "zstd"] }
+reqwest = { version = "0.13.5", features = ["blocking", "brotli", "deflate", "form", "gzip", "json", "multipart", "query", "stream", "zstd"] }
+rgb = "0.8.53"
+tokio = { version = "1.54.1", features = ["macros","rt-multi-thread","time"] }

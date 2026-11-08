@@ -1,19 +1,26 @@
-use eframe::egui::{Align, Color32, Label, RichText, Widget};
+use eframe::egui::{Align, Color32, FontFamily, Label, RichText, Widget};
 
-pub struct Title {}
+pub struct Title {
+    title: String,
+}
 
 impl Title {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(title: String) -> Self {
+        Self { title }
     }
 }
 
-impl Widget for Title {
+impl Widget for &mut Title {
     fn ui(self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
         ui.add(
-            Label::new(RichText::new("Among Us Impostor").color(Color32::WHITE))
-                .halign(Align::Center)
-                .selectable(false),
+            Label::new(
+                RichText::new(&self.title)
+                    .color(Color32::WHITE)
+                    .family(FontFamily::Name("lyricsbold".into()))
+                    .size(ui.available_height() * 0.75),
+            )
+            .halign(Align::Center)
+            .selectable(false),
         )
     }
 }
