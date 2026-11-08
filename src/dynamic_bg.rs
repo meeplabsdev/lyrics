@@ -1,21 +1,32 @@
-use std::num::NonZeroU64;
-
 use eframe::{
     egui::{PaintCallbackInfo, Response, Ui, Widget},
-    egui_wgpu::{Callback, CallbackResources, CallbackTrait},
+    egui_wgpu::{Callback, CallbackResources, CallbackTrait, ScreenDescriptor},
     wgpu::{
         BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
-        BindGroupLayoutEntry, BindingType, BufferBindingType, BufferUsages, FragmentState,
-        MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState,
-        RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource,
-        ShaderStages, VertexState,
+        BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferUsages, CommandBuffer,
+        CommandEncoder, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
+        PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline,
+        RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderSource, ShaderStages, VertexState,
         util::{BufferInitDescriptor, DeviceExt},
     },
 };
+use rgb::Rgb;
+use std::{num::NonZeroU64, time::Instant};
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct DynamicBgUniforms {
+    delta: f32,
+    _1: [f32; 3],
+    time: f32,
+    _2: [f32; 3],
+    colours: [[f32; 4]; 4],
+}
 
 struct DynamicBgRenderResources {
     pipeline: RenderPipeline,
     bind_group: BindGroup,
+    uniform_buffer: Buffer,
 }
 
 impl DynamicBgRenderResources {
@@ -24,11 +35,43 @@ impl DynamicBgRenderResources {
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.draw(0..6, 0..1);
     }
+
+    pub fn write_uniforms(&self, queue: &Queue, delta: f32, time: f32, colours: [[f32; 4]; 4]) {
+        let uniforms = DynamicBgUniforms {
+            delta,
+            _1: [0.0; 3],
+            time,
+            _2: [0.0; 3],
+            colours,
+        };
+
+        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+    }
 }
 
-struct DynamicBgCallback {}
+struct DynamicBgCallback {
+    delta: f32,
+    time: f32,
+    colours: [[f32; 4]; 4],
+}
 
 impl CallbackTrait for DynamicBgCallback {
+    fn prepare(
+        &self,
+        _device: &Device,
+        queue: &Queue,
+        _screen_descriptor: &ScreenDescriptor,
+        _egui_encoder: &mut CommandEncoder,
+        resources: &mut CallbackResources,
+    ) -> Vec<CommandBuffer> {
+        resources
+            .get::<DynamicBgRenderResources>()
+            .unwrap()
+            .write_uniforms(queue, self.delta, self.time, self.colours);
+
+        Vec::new()
+    }
+
     fn paint(
         &self,
         _info: PaintCallbackInfo,
@@ -42,7 +85,11 @@ impl CallbackTrait for DynamicBgCallback {
     }
 }
 
-pub struct DynamicBg {}
+pub struct DynamicBg {
+    colours: [[f32; 4]; 4],
+    first_update: Instant,
+    last_update: Instant,
+}
 
 impl DynamicBg {
     pub fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
@@ -58,11 +105,11 @@ impl DynamicBg {
             label: Some("dynamicbg"),
             entries: &[BindGroupLayoutEntry {
                 binding: 0,
-                visibility: ShaderStages::VERTEX,
+                visibility: ShaderStages::VERTEX | ShaderStages::FRAGMENT,
                 ty: BindingType::Buffer {
                     ty: BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: NonZeroU64::new(16),
+                    min_binding_size: NonZeroU64::new(96),
                 },
                 count: None,
             }],
@@ -98,7 +145,13 @@ impl DynamicBg {
 
         let uniform_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("dynamicbg"),
-            contents: bytemuck::cast_slice(&[0.0_f32; 4]),
+            contents: bytemuck::cast_slice(&[DynamicBgUniforms {
+                delta: 0.0,
+                _1: [0.0; 3],
+                time: 0.0,
+                _2: [0.0; 3],
+                colours: [[0.0; 4]; 4],
+            }]),
             usage: BufferUsages::COPY_DST | BufferUsages::UNIFORM,
         });
 
@@ -118,18 +171,55 @@ impl DynamicBg {
             .insert(DynamicBgRenderResources {
                 pipeline,
                 bind_group,
+                uniform_buffer,
             });
 
-        Some(Self {})
+        Some(Self {
+            colours: [[0.0; 4]; 4],
+            first_update: Instant::now(),
+            last_update: Instant::now(),
+        })
+    }
+
+    pub fn set_colours(&mut self, colours: Vec<Rgb<u8>>) {
+        if colours.len() < 4 {
+            return;
+        }
+
+        let colours = *colours
+            .iter()
+            .take(4)
+            .map(|c| {
+                [
+                    c.r as f32 / 255.0,
+                    c.g as f32 / 255.0,
+                    c.b as f32 / 255.0,
+                    1.0,
+                ]
+            })
+            .collect::<Vec<[f32; 4]>>()
+            .as_array::<4>()
+            .unwrap();
+
+        self.colours = colours;
     }
 }
 
 impl Widget for &mut DynamicBg {
     fn ui(self, ui: &mut Ui) -> Response {
         let rect = ui.max_rect();
+        let now = Instant::now();
 
-        ui.painter()
-            .add(Callback::new_paint_callback(rect, DynamicBgCallback {}));
+        ui.painter().add(Callback::new_paint_callback(
+            rect,
+            DynamicBgCallback {
+                colours: self.colours,
+                delta: (now - self.last_update).as_secs_f32(),
+                time: (now - self.first_update).as_secs_f32(),
+            },
+        ));
+
+        self.last_update = now;
         ui.request_repaint(); // continuous widget
 
         ui.response()

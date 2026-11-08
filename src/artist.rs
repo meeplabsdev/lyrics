@@ -15,7 +15,7 @@ impl Widget for &mut Artist {
     fn ui(self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
         ui.add(
             Label::new(
-                RichText::new(format!("{} - {}", self.year, self.artist))
+                RichText::new(format!("{:04} - {}", self.year, self.artist))
                     .color(Color32::WHITE)
                     .family(FontFamily::Name("lyricsregular".into()))
                     .size(ui.available_height() * 0.75),

@@ -24,8 +24,6 @@ impl Artwork {
 
         std::thread::spawn(move || {
             let result = fetch(&fetch_uri).and_then(|image| {
-                paris::info!("calculating palette now");
-
                 Ok((
                     image.clone(),
                     color_thief::get_palette(
@@ -35,7 +33,7 @@ impl Artwork {
                             .flat_map(|a| a.to_array())
                             .collect::<Vec<u8>>(),
                         ColorFormat::Rgba,
-                        1,
+                        4,
                         4,
                     )?,
                 ))

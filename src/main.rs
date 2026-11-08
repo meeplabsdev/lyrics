@@ -36,17 +36,21 @@ impl LyricsApp {
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
             controls: Controls::new(),
             artwork: Artwork::new(
-                "https://i.scdn.co/image/ab67616d0000b273850e59c887aec05f031c022d".into(),
+                "https://i.scdn.co/image/ab67616d0000b273a1e401887d493ff4cea50e76".into(),
             ),
             lyrics: Lyrics::new(),
-            title: Title::new("Please Let Me Wonder".into()),
-            artist: Artist::new(1965, "The Beach Boys".into()),
+            title: Title::new("KINDA WANT TO FUCK BUT OH GOD IM SCARED".into()),
+            artist: Artist::new(0000, "Vertigoaway".into()),
         })
     }
 }
 
 impl eframe::App for LyricsApp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
+        if let Some((_, colours, _)) = self.artwork.state() {
+            self.bg.set_colours(colours);
+        }
+
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(ui, |ui| {
