@@ -1,7 +1,7 @@
+use crate::colour::Colour;
 use core::f32;
+use eframe::egui::{FontFamily, FontId, Pos2, Sense, Widget};
 use std::time::Duration;
-
-use eframe::egui::{Color32, FontFamily, FontId, Pos2, Sense, Widget};
 
 pub struct Artist {
     year: u16,
@@ -27,7 +27,7 @@ impl Widget for &mut Artist {
         let galley = ui.painter().layout_no_wrap(
             format!("{:04} - {}", self.year, self.artist),
             font_id,
-            Color32::WHITE,
+            Colour::WHITE.into(),
         );
 
         let text_size = galley.size();
@@ -49,7 +49,7 @@ impl Widget for &mut Artist {
             Pos2::new(rect.left() + offset_x, rect.center().y - text_size.y * 0.5)
         };
 
-        ui.painter().galley(text_pos, galley, Color32::WHITE);
+        ui.painter().galley(text_pos, galley, Colour::WHITE.into());
 
         if overflow > 0.0 {
             ui.ctx().request_repaint_after(Duration::from_millis(16));

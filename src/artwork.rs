@@ -1,12 +1,14 @@
+use crate::colour::Colour;
 use anyhow::Result;
 use color_thief::ColorFormat;
-use eframe::egui::{Color32, ColorImage, Context, Image, TextureHandle, TextureOptions, Widget};
-use rgb::Rgb;
+use eframe::egui::{
+    ColorImage, Context, Image, Sense, Shadow, TextureHandle, TextureOptions, Widget,
+};
 use std::sync::{Arc, Mutex};
 
 enum State {
     Loading,
-    Ready((ColorImage, Vec<Rgb<u8>>)),
+    Ready((ColorImage, Vec<Colour>)),
     Failed(String),
 }
 
@@ -35,7 +37,10 @@ impl Artwork {
                         ColorFormat::Rgba,
                         4,
                         4,
-                    )?,
+                    )?
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
                 ))
             });
 
@@ -49,12 +54,12 @@ impl Artwork {
         Self { uri, state }
     }
 
-    pub fn state(&self) -> Option<(Vec<Color32>, Vec<Rgb<u8>>, [usize; 2])> {
+    pub fn state(&self) -> Option<(Vec<Colour>, Vec<Colour>, [usize; 2])> {
         let state = self.state.lock().unwrap();
 
         match &*state {
             State::Ready((image, colours)) => Some((
-                image.pixels.clone(),
+                image.pixels.clone().into_iter().map(|p| p.into()).collect(),
                 colours.clone(),
                 [image.width(), image.height()],
             )),
@@ -65,22 +70,40 @@ impl Artwork {
 
 impl Widget for &mut Artwork {
     fn ui(self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
+        let (rect, response) =
+            ui.allocate_exact_size(ui.available_size(), Sense::HOVER | Sense::CLICK);
+
         let state = self.state.lock().unwrap();
+        let painter = ui.painter();
+
+        let img_rect = rect.scale_from_center(0.95);
 
         match &*state {
             State::Loading => {
                 ui.spinner();
                 ui.ctx().request_repaint();
-                ui.response()
             }
-            State::Failed(err) => ui.label(format!("Failed: {err}")),
-            State::Ready((image, _)) => ui.add(
+            State::Failed(err) => {
+                ui.label(format!("Failed: {err}"));
+            }
+            State::Ready((image, _)) => {
+                painter.add(
+                    Shadow {
+                        blur: (rect.width() - img_rect.width()) as u8,
+                        color: Colour::from_rgba(0, 0, 0, 100).into(),
+                        ..Default::default()
+                    }
+                    .as_shape(img_rect, 0),
+                );
+
                 Image::from_texture(&texture(ui.ctx(), &self.uri, image))
                     .fit_to_original_size(1.0)
-                    .max_size(ui.available_size())
-                    .corner_radius(4),
-            ),
+                    .corner_radius(8)
+                    .paint_at(ui, img_rect);
+            }
         }
+
+        response
     }
 }
 

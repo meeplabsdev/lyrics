@@ -2,6 +2,7 @@
 
 mod artist;
 mod artwork;
+mod colour;
 mod controls;
 mod dynamic_bg;
 mod layout;
@@ -36,11 +37,11 @@ impl LyricsApp {
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
             controls: Controls::new(),
             artwork: Artwork::new(
-                "https://i.scdn.co/image/ab67616d0000b273a1e401887d493ff4cea50e76".into(),
+                "https://i.scdn.co/image/ab67616d0000b27320754a1128d65c6b9688ea3d".into(),
             ),
             lyrics: Lyrics::new(),
-            title: Title::new("KINDA WANT TO FUCK BUT OH GOD IM SCARED".into()),
-            artist: Artist::new(0000, "Vertigoaway".into()),
+            title: Title::new("NTR Ending (Cardiac Arrest Due to Overdose)".into()),
+            artist: Artist::new(0000, "SWRSLT".into()),
         })
     }
 }

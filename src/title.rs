@@ -1,7 +1,7 @@
+use crate::colour::Colour;
 use core::f32;
+use eframe::egui::{FontFamily, FontId, Pos2, Sense, Widget};
 use std::time::Duration;
-
-use eframe::egui::{Color32, FontFamily, FontId, Pos2, Sense, Widget};
 
 pub struct Title {
     title: String,
@@ -25,7 +25,7 @@ impl Widget for &mut Title {
 
         let galley = ui
             .painter()
-            .layout_no_wrap(self.title.clone(), font_id, Color32::WHITE);
+            .layout_no_wrap(self.title.clone(), font_id, Colour::WHITE.into());
 
         let text_size = galley.size();
         let overflow = text_size.x - rect.width();
@@ -49,7 +49,7 @@ impl Widget for &mut Title {
             Pos2::new(rect.left() + offset_x, rect.center().y - text_size.y * 0.5)
         };
 
-        ui.painter().galley(text_pos, galley, Color32::WHITE);
+        ui.painter().galley(text_pos, galley, Colour::WHITE.into());
 
         if overflow > 0.0 {
             ui.ctx().request_repaint_after(Duration::from_millis(16));

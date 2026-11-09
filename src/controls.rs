@@ -1,4 +1,5 @@
-use eframe::egui::{Align2, Color32, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
+use crate::colour::Colour;
+use eframe::egui::{Align2, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 
 pub struct Controls {
     progress: f32,
@@ -44,7 +45,7 @@ impl Widget for &mut Controls {
                 Vec2::new(track_width * (1.0 - self.progress), 4.0),
             ),
             6.0,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 40),
+            Colour::WEAK,
         );
 
         painter.rect_filled(
@@ -53,29 +54,29 @@ impl Widget for &mut Controls {
                 Vec2::new(track_width * self.progress, 4.0),
             ),
             6.0,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 200),
+            Colour::STRONG,
         );
 
         painter.circle_filled(
             Pos2::new(handle_x, rect.center().y),
             4.2,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 255), // handle
+            Colour::WHITE, // handle
         );
 
         painter.text(
-            Pos2::new(offset_h - 10.0 + rect.left(), rect.center().y),
+            Pos2::new(offset_h - 8.0 + rect.left(), rect.center().y),
             Align2::RIGHT_CENTER,
             seconds_to_string((self.length as f32 * self.progress) as i32),
-            FontId::new(12.0, FontFamily::Name("lyricsregular".into())),
-            Color32::WHITE,
+            FontId::new(12.0, FontFamily::Name("lyricsmedium".into())),
+            Colour::WHITE.into(),
         );
 
         painter.text(
-            Pos2::new(10.0 - offset_h + rect.right(), rect.center().y),
+            Pos2::new(8.0 - offset_h + rect.right(), rect.center().y),
             Align2::LEFT_CENTER,
             seconds_to_string(self.length),
-            FontId::new(12.0, FontFamily::Name("lyricsregular".into())),
-            Color32::WHITE,
+            FontId::new(12.0, FontFamily::Name("lyricsmedium".into())),
+            Colour::WHITE.into(),
         );
 
         ui.request_repaint_after_secs(0.1);

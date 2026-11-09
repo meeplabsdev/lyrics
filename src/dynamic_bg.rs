@@ -1,3 +1,4 @@
+use crate::colour::Colour;
 use eframe::{
     egui::{PaintCallbackInfo, Response, Ui, Widget},
     egui_wgpu::{Callback, CallbackResources, CallbackTrait, ScreenDescriptor},
@@ -10,7 +11,6 @@ use eframe::{
         util::{BufferInitDescriptor, DeviceExt},
     },
 };
-use rgb::Rgb;
 use std::{num::NonZeroU64, time::Instant};
 
 #[repr(C)]
@@ -181,22 +181,15 @@ impl DynamicBg {
         })
     }
 
-    pub fn set_colours(&mut self, colours: Vec<Rgb<u8>>) {
+    pub fn set_colours(&mut self, colours: Vec<Colour>) {
         if colours.len() < 4 {
             return;
         }
 
         let colours = *colours
-            .iter()
+            .into_iter()
             .take(4)
-            .map(|c| {
-                [
-                    c.r as f32 / 255.0,
-                    c.g as f32 / 255.0,
-                    c.b as f32 / 255.0,
-                    1.0,
-                ]
-            })
+            .map(Colour::into_array_f32)
             .collect::<Vec<[f32; 4]>>()
             .as_array::<4>()
             .unwrap();
