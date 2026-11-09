@@ -1,42 +1,92 @@
-use eframe::egui::{Color32, Pos2, Rect, Sense, Slider, Stroke, Vec2, Widget, style::HandleShape};
+use eframe::egui::{Align2, Color32, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 
-pub struct Controls {}
+pub struct Controls {
+    progress: f32,
+    length: i32,
+}
 
 impl Controls {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            progress: 0.4,
+            length: 115,
+        }
     }
 }
 
 impl Widget for &mut Controls {
     fn ui(self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
-        let (rect, response) = ui.allocate_exact_size(
-            Vec2::new(ui.available_width(), 6.0),
-            Sense::click_and_drag(),
-        );
+        let (rect, mut response) =
+            ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+
+        let offset_h = 42.0;
+        let track_start = offset_h + rect.left();
+        let track_width = (rect.width() - 2.0 * offset_h).max(0.0);
+
+        if track_width > 0.0 {
+            if let Some(pointer_pos) = response.interact_pointer_pos() {
+                let relative_x = pointer_pos.x - track_start;
+                let new_progress = (relative_x / track_width).clamp(0.0, 1.0);
+
+                if (new_progress - self.progress).abs() > f32::EPSILON {
+                    self.progress = new_progress;
+                    response.mark_changed();
+                }
+            }
+        }
 
         let painter = ui.painter_at(rect);
-        let progress = 0.4;
-        let handle_x = rect.left() + rect.width() * progress;
+        let handle_x = track_start + (rect.width() - 2.0 * offset_h) * self.progress;
 
         painter.rect_filled(
-            rect,
+            Rect::from_min_size(
+                Pos2::new(handle_x, rect.center().y - 2.0),
+                Vec2::new(track_width * (1.0 - self.progress), 4.0),
+            ),
             6.0,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 40), // future audio
+            Color32::from_rgba_unmultiplied(255, 255, 255, 40),
         );
 
         painter.rect_filled(
-            Rect::from_min_max(rect.min, Pos2::new(handle_x, rect.max.y)),
+            Rect::from_min_size(
+                Pos2::new(track_start, rect.center().y - 2.0),
+                Vec2::new(track_width * self.progress, 4.0),
+            ),
             6.0,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 200), // past audio
+            Color32::from_rgba_unmultiplied(255, 255, 255, 200),
         );
 
         painter.circle_filled(
             Pos2::new(handle_x, rect.center().y),
-            7.0,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 100), // handle
+            4.2,
+            Color32::from_rgba_unmultiplied(255, 255, 255, 255), // handle
         );
+
+        painter.text(
+            Pos2::new(offset_h - 10.0 + rect.left(), rect.center().y),
+            Align2::RIGHT_CENTER,
+            seconds_to_string((self.length as f32 * self.progress) as i32),
+            FontId::new(12.0, FontFamily::Name("lyricsregular".into())),
+            Color32::WHITE,
+        );
+
+        painter.text(
+            Pos2::new(10.0 - offset_h + rect.right(), rect.center().y),
+            Align2::LEFT_CENTER,
+            seconds_to_string(self.length),
+            FontId::new(12.0, FontFamily::Name("lyricsregular".into())),
+            Color32::WHITE,
+        );
+
+        ui.request_repaint_after_secs(0.1);
 
         response
     }
+}
+
+fn seconds_to_string(seconds: i32) -> String {
+    let mins = seconds / 60;
+    let rem = seconds % 60;
+
+    format!("{mins:02}:{rem:02}")
 }

@@ -36,11 +36,11 @@ impl LyricsApp {
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
             controls: Controls::new(),
             artwork: Artwork::new(
-                "https://i.scdn.co/image/ab67616d0000b273a1e401887d493ff4cea50e76".into(),
+                "https://i.scdn.co/image/ab67616d0000b273e65ea6fee33fa7efb58921d1".into(),
             ),
             lyrics: Lyrics::new(),
-            title: Title::new("KINDA WANT TO FUCK BUT OH GOD IM SCARED".into()),
-            artist: Artist::new(0000, "Vertigoaway".into()),
+            title: Title::new("ATTACKING VERTICAL".into()),
+            artist: Artist::new(0000, "femtanyl".into()),
         })
     }
 }

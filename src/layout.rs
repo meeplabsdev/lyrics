@@ -26,8 +26,8 @@ impl Layout {
         );
 
         let controls = Rect::from_min_size(
-            artwork.left_bottom() + Vec2::new(4.0, 8.0),
-            Vec2::new(artwork.width() - 8.0, screen_h / 25.0),
+            artwork.left_bottom() + Vec2::new(-16.0, 8.0),
+            Vec2::new(artwork.width() + 32.0, screen_h / 25.0),
         );
 
         let title = Rect::from_min_size(
