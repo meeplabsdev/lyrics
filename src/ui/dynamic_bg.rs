@@ -1,6 +1,6 @@
 use crate::colour::Colour;
 use eframe::{
-    egui::{PaintCallbackInfo, Response, Ui, Widget},
+    egui::{PaintCallbackInfo, Response, Sense, Ui, Widget},
     egui_wgpu::{Callback, CallbackResources, CallbackTrait, ScreenDescriptor},
     wgpu::{
         BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
@@ -98,7 +98,7 @@ impl DynamicBg {
 
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("dynamicbg"),
-            source: ShaderSource::Wgsl(include_str!("../assets/dynamicbg.wgsl").into()),
+            source: ShaderSource::Wgsl(include_str!("../../assets/dynamicbg.wgsl").into()),
         });
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
@@ -200,7 +200,7 @@ impl DynamicBg {
 
 impl Widget for &mut DynamicBg {
     fn ui(self, ui: &mut Ui) -> Response {
-        let rect = ui.max_rect();
+        let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::empty());
         let now = Instant::now();
 
         ui.painter().add(Callback::new_paint_callback(
@@ -215,6 +215,6 @@ impl Widget for &mut DynamicBg {
         self.last_update = now;
         ui.request_repaint(); // continuous widget
 
-        ui.response()
+        response
     }
 }

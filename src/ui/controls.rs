@@ -2,16 +2,24 @@ use crate::colour::Colour;
 use eframe::egui::{Align2, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 
 pub struct Controls {
+    length: u32,
     progress: f32,
-    length: i32,
 }
 
 impl Controls {
     pub fn new() -> Self {
         Self {
-            progress: 0.4,
-            length: 115,
+            length: 0,
+            progress: 0.0,
         }
+    }
+
+    pub fn set_length(&mut self, length: u32) {
+        self.length = length;
+    }
+
+    pub fn set_progress(&mut self, progress: f32) {
+        self.progress = progress;
     }
 }
 
@@ -30,6 +38,7 @@ impl Widget for &mut Controls {
                 let new_progress = (relative_x / track_width).clamp(0.0, 1.0);
 
                 if (new_progress - self.progress).abs() > f32::EPSILON {
+                    // TODO: send new progress onto event
                     self.progress = new_progress;
                     response.mark_changed();
                 }
@@ -66,7 +75,7 @@ impl Widget for &mut Controls {
         painter.text(
             Pos2::new(offset_h - 8.0 + rect.left(), rect.center().y),
             Align2::RIGHT_CENTER,
-            seconds_to_string((self.length as f32 * self.progress) as i32),
+            seconds_to_string((self.length as f32 * self.progress) as u32),
             FontId::new(12.0, FontFamily::Name("lyricsmedium".into())),
             Colour::WHITE.into(),
         );
@@ -85,7 +94,7 @@ impl Widget for &mut Controls {
     }
 }
 
-fn seconds_to_string(seconds: i32) -> String {
+fn seconds_to_string(seconds: u32) -> String {
     let mins = seconds / 60;
     let rem = seconds % 60;
 

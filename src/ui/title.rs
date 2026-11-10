@@ -8,8 +8,14 @@ pub struct Title {
 }
 
 impl Title {
-    pub fn new(title: String) -> Self {
-        Self { title }
+    pub fn new() -> Self {
+        Self {
+            title: String::new(),
+        }
+    }
+
+    pub fn set_title(&mut self, title: String) {
+        self.title = title;
     }
 }
 
@@ -40,9 +46,6 @@ impl Widget for &mut Title {
             let period = overflow / speed;
 
             let t = ui.ctx().input(|i| i.time) as f32;
-            // let phase = (t / period) % 2.0;
-            // let progress = if phase <= 1.0 { phase } else { 2.0 - phase };
-            // let offset_x = -overflow * progress;
             let progress = 0.5 - 0.5 * (t * f32::consts::TAU / (period * 2.0)).cos();
             let offset_x = -overflow * progress;
 

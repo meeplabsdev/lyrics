@@ -4,13 +4,21 @@ use eframe::egui::{FontFamily, FontId, Pos2, Sense, Widget};
 use std::time::Duration;
 
 pub struct Artist {
-    year: u16,
-    artist: String,
+    name: String,
+    year: u32,
 }
 
 impl Artist {
-    pub fn new(year: u16, artist: String) -> Self {
-        Self { year, artist }
+    pub fn new() -> Self {
+        Self {
+            name: String::new(),
+            year: 0000,
+        }
+    }
+
+    pub fn set_artist(&mut self, name: String, year: u32) {
+        self.name = name;
+        self.year = year;
     }
 }
 
@@ -25,7 +33,7 @@ impl Widget for &mut Artist {
         let (rect, response) = ui.allocate_exact_size(available, Sense::hover());
 
         let galley = ui.painter().layout_no_wrap(
-            format!("{:04} - {}", self.year, self.artist),
+            format!("{:04} - {}", self.year, self.name),
             font_id,
             Colour::WHITE.into(),
         );

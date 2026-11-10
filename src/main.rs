@@ -1,18 +1,19 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod artist;
-mod artwork;
 mod colour;
-mod controls;
-mod dynamic_bg;
 mod layout;
-mod lyrics;
-mod title;
+mod state;
+mod ui;
 mod utils;
 
 use crate::{
-    artist::Artist, artwork::Artwork, controls::Controls, dynamic_bg::DynamicBg, layout::Layout,
-    lyrics::Lyrics, title::Title, utils::PutClipped,
+    layout::Layout,
+    state::{Event, State},
+    ui::{
+        artist::Artist, artwork::Artwork, controls::Controls, dynamic_bg::DynamicBg,
+        lyrics::Lyrics, title::Title,
+    },
+    utils::PutClipped,
 };
 use anyhow::{Context, Result};
 use eframe::{
@@ -23,6 +24,7 @@ use eframe::{
 pub const WINDOW_SIZE: [f32; 2] = [1024.0, 600.0];
 
 struct LyricsApp {
+    state: State,
     bg: DynamicBg,
     controls: Controls,
     artwork: Artwork,
@@ -32,24 +34,55 @@ struct LyricsApp {
 }
 
 impl LyricsApp {
-    fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Result<Self> {
+    fn new<'a>(cc: &'a eframe::CreationContext<'a>, state: State) -> Result<Self> {
         Ok(Self {
+            state,
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
             controls: Controls::new(),
-            artwork: Artwork::new(
-                "https://i.scdn.co/image/ab67616d0000b27320754a1128d65c6b9688ea3d".into(),
-            ),
+            artwork: Artwork::new(),
             lyrics: Lyrics::new(),
-            title: Title::new("NTR Ending (Cardiac Arrest Due to Overdose)".into()),
-            artist: Artist::new(0000, "SWRSLT".into()),
+            title: Title::new(),
+            artist: Artist::new(),
         })
+    }
+
+    fn handle_event(&mut self, event: Event, ui: &mut egui::Ui) {
+        match event {
+            Event::TrackChanged {
+                title,
+                artist,
+                year,
+                length,
+            } => {
+                self.artist.set_artist(artist, year);
+                self.controls.set_length(length);
+                self.controls.set_progress(0.0);
+                self.title.set_title(title);
+            }
+            Event::ProgressChanged { progress } => {
+                self.controls.set_progress(progress);
+            }
+            Event::ArtworkChanged {
+                name,
+                image,
+                colours,
+            } => {
+                self.artwork.set_image(name, image);
+                self.bg.set_colours(colours);
+            }
+        }
+
+        ui.request_repaint();
     }
 }
 
 impl eframe::App for LyricsApp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
-        if let Some((_, colours, _)) = self.artwork.state() {
-            self.bg.set_colours(colours);
+        loop {
+            match self.state.event() {
+                Ok(event) => self.handle_event(event, ui),
+                Err(_) => break,
+            }
         }
 
         egui::CentralPanel::default()
@@ -119,7 +152,25 @@ fn main() -> eframe::Result {
                 }],
             ));
 
-            Ok(Box::new(LyricsApp::new(cc)?))
+            let mut state = State::new();
+            let app = LyricsApp::new(cc, state.clone())?;
+
+            state
+                .set_track(
+                    "NTR Ending (Cardiac Arrest Due to Overdose)",
+                    "SWRSLT",
+                    0000,
+                    115,
+                )
+                .unwrap();
+
+            state.set_progress(0.4).unwrap();
+
+            state
+                .set_artwork("https://i.scdn.co/image/ab67616d0000b27320754a1128d65c6b9688ea3d")
+                .unwrap();
+
+            Ok(Box::new(app))
         }),
     )
 }
