@@ -1,6 +1,10 @@
 # Lyrics
 
-This is a project I started on week 3 of [Terra](https://terra.hackclub.com/). It is just a lyrics viewer / music controller program. Currently the UI includes:
+https://github.com/user-attachments/assets/993140aa-a0d1-4a0f-bf92-9f0a73c95d26
+
+# How
+
+This is a project I started on week 3 of [Terra](https://terra.hackclub.com/). It is just a lyrics viewer / music controller program written in rust using the eframe/egui ecosystem. Currently the UI includes:
 - Song name
 - Artist name
 - Release year
