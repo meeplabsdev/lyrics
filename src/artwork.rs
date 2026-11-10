@@ -76,7 +76,7 @@ impl Widget for &mut Artwork {
         let state = self.state.lock().unwrap();
         let painter = ui.painter();
 
-        let img_rect = rect.scale_from_center(0.95);
+        let img_rect = rect.scale_from_center(0.96);
 
         match &*state {
             State::Loading => {
@@ -98,7 +98,7 @@ impl Widget for &mut Artwork {
 
                 Image::from_texture(&texture(ui.ctx(), &self.uri, image))
                     .fit_to_original_size(1.0)
-                    .corner_radius(8)
+                    .corner_radius(6)
                     .paint_at(ui, img_rect);
             }
         }
