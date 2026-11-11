@@ -59,9 +59,6 @@ impl LyricsApp {
                 self.controls.set_progress(0.0);
                 self.title.set_title(title);
             }
-            Event::ProgressChanged { progress } => {
-                self.controls.set_progress(progress);
-            }
             Event::ArtworkChanged {
                 name,
                 image,
@@ -70,6 +67,7 @@ impl LyricsApp {
                 self.artwork.set_image(name, image);
                 self.bg.set_colours(colours);
             }
+            _ => {}
         }
 
         ui.request_repaint();
