@@ -1,16 +1,20 @@
-use crate::colour::Colour;
+use crate::{colour::Colour, state::State};
 use eframe::egui::{Align2, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 
 pub struct Controls {
+    state: State,
     length: u32,
     progress: f32,
+    scrub_progress: Option<f32>,
 }
 
 impl Controls {
-    pub fn new() -> Self {
+    pub fn new(state: State) -> Self {
         Self {
+            state,
             length: 0,
             progress: 0.0,
+            scrub_progress: None,
         }
     }
 
@@ -38,20 +42,24 @@ impl Widget for &mut Controls {
                 let new_progress = (relative_x / track_width).clamp(0.0, 1.0);
 
                 if (new_progress - self.progress).abs() > f32::EPSILON {
-                    // TODO: send new progress onto event
-                    self.progress = new_progress;
+                    self.scrub_progress = Some(new_progress);
                     response.mark_changed();
                 }
+            } else if let Some(scrub_progress) = self.scrub_progress.take() {
+                let _ = self.state.set_progress(scrub_progress);
+                self.progress = scrub_progress;
+                response.mark_changed();
             }
         }
 
         let painter = ui.painter_at(rect);
-        let handle_x = track_start + (rect.width() - 2.0 * offset_h) * self.progress;
+        let progress = self.scrub_progress.unwrap_or(self.progress);
+        let handle_x = track_start + (rect.width() - 2.0 * offset_h) * progress;
 
         painter.rect_filled(
             Rect::from_min_size(
                 Pos2::new(handle_x, rect.center().y - 2.0),
-                Vec2::new(track_width * (1.0 - self.progress), 4.0),
+                Vec2::new(track_width * (1.0 - progress), 4.0),
             ),
             6.0,
             Colour::WEAK,
@@ -60,7 +68,7 @@ impl Widget for &mut Controls {
         painter.rect_filled(
             Rect::from_min_size(
                 Pos2::new(track_start, rect.center().y - 2.0),
-                Vec2::new(track_width * self.progress, 4.0),
+                Vec2::new(track_width * progress, 4.0),
             ),
             6.0,
             Colour::STRONG,
@@ -75,7 +83,7 @@ impl Widget for &mut Controls {
         painter.text(
             Pos2::new(offset_h - 8.0 + rect.left(), rect.center().y),
             Align2::RIGHT_CENTER,
-            seconds_to_string((self.length as f32 * self.progress) as u32),
+            seconds_to_string((self.length as f32 * progress) as u32),
             FontId::new(12.0, FontFamily::Name("lyricsmedium".into())),
             Colour::WHITE.into(),
         );

@@ -46,9 +46,13 @@ impl State {
         year: u32,
         length: u32,
     ) -> Result<(), SendError<Event>> {
+        let title = title.into();
+        let artist = artist.into();
+
+        paris::log!("Set track to {title}");
         self.tx.send(Event::TrackChanged {
-            title: title.into(),
-            artist: artist.into(),
+            title,
+            artist,
             year,
             length,
         })?;
@@ -57,6 +61,7 @@ impl State {
     }
 
     pub fn set_progress(&mut self, progress: f32) -> Result<(), SendError<Event>> {
+        paris::log!("Set progress to {progress}");
         self.tx.send(Event::ProgressChanged { progress })?;
 
         Ok(())
@@ -64,6 +69,7 @@ impl State {
 
     pub fn set_artwork(&mut self, uri: impl Into<String>) -> Result<()> {
         let uri = uri.into();
+
         let resp = reqwest::blocking::get(&uri)?.error_for_status()?;
         let bytes = resp.bytes()?;
 
@@ -88,6 +94,7 @@ impl State {
         .map(Into::into)
         .collect();
 
+        paris::log!("Set artwork to {uri}");
         self.tx.send(Event::ArtworkChanged {
             name: uri,
             image,

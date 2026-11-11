@@ -36,13 +36,13 @@ struct LyricsApp {
 impl LyricsApp {
     fn new<'a>(cc: &'a eframe::CreationContext<'a>, state: State) -> Result<Self> {
         Ok(Self {
-            state,
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
-            controls: Controls::new(),
+            controls: Controls::new(state.clone()),
             artwork: Artwork::new(),
             lyrics: Lyrics::new(),
             title: Title::new(),
             artist: Artist::new(),
+            state,
         })
     }
 
