@@ -18,4 +18,8 @@ It is missing:
 
 # Demo
 
-I can only build the project for linux at this point in time, so you will only find releases for linux, but it should run perfectly fine on windows or mac aswell, or even webasm with some effort put in. TO build it from source is extremely simple, since all you need to do is enter the directory and run `cargo run` or `cargo build` (and obviously you need rust/cargo installed).
+I can only build the project for linux at this point in time, so you will only find releases for linux, but it should run perfectly fine on windows or mac aswell, or even webasm with some effort put in. To build it from source is extremely simple, since all you need to do is enter the directory and run `cargo run` or `cargo build` (and obviously you need rust/cargo installed).
+
+# Building
+
+If you want to test it on windows, (I cannot confirm if this works on not), you must build it yourself. You must have rust/cargo installed, and run `cargo run` or `cargo build` inside the project directory (the one with `Cargo.toml`). The output will be `target/debug/lyrics(.exe)`. Optionally you can build with `--release` for an optimised build, which will be output to `target/release/lyrics(.exe)`. There are no external dependencies not handled by cargo.
