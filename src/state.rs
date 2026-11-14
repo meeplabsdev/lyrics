@@ -87,8 +87,8 @@ impl State {
                 .flat_map(|a| a.to_array())
                 .collect::<Vec<u8>>(),
             ColorFormat::Rgba,
-            4,
-            4,
+            1,
+            3,
         )?
         .into_iter()
         .map(Into::into)
