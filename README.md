@@ -1,6 +1,6 @@
 # Lyrics
 
-https://github.com/user-attachments/assets/993140aa-a0d1-4a0f-bf92-9f0a73c95d26
+https://github.com/user-attachments/assets/32908b58-635a-4530-9cda-c166dd8e1e28
 
 # How
 
