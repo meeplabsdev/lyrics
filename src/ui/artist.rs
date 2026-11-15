@@ -30,7 +30,7 @@ impl Widget for &mut Artist {
         );
 
         let available = ui.available_size();
-        let (rect, response) = ui.allocate_exact_size(available, Sense::hover());
+        let (rect, response) = ui.allocate_exact_size(available, Sense::empty());
 
         let galley = ui.painter().layout_no_wrap(
             format!("{:04} - {}", self.year, self.name),

@@ -27,7 +27,7 @@ impl Widget for &mut Title {
         );
 
         let available = ui.available_size();
-        let (rect, response) = ui.allocate_exact_size(available, Sense::hover());
+        let (rect, response) = ui.allocate_exact_size(available, Sense::empty());
 
         let galley = ui
             .painter()

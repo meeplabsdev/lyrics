@@ -22,8 +22,7 @@ impl Artwork {
 
 impl Widget for &mut Artwork {
     fn ui(self, ui: &mut eframe::egui::Ui) -> eframe::egui::Response {
-        let (rect, response) =
-            ui.allocate_exact_size(ui.available_size(), Sense::HOVER | Sense::CLICK);
+        let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::empty());
 
         let painter = ui.painter();
         let img_rect = rect.scale_from_center(0.96);
