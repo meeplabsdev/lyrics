@@ -163,16 +163,11 @@ fn main() -> eframe::Result {
             let app = LyricsApp::new(cc, state.clone())?;
 
             state
-                .set_track(
-                    "NTR Ending (Cardiac Arrest Due to Overdose)",
-                    "SWRSLT",
-                    0000,
-                    115,
-                )
+                .set_track("Honestly", "THØRNS, Kasane Teto", 2024, 218)
                 .unwrap();
 
             state
-                .set_artwork("https://i.scdn.co/image/ab67616d0000b27320754a1128d65c6b9688ea3d")
+                .set_artwork("https://i.scdn.co/image/ab67616d0000b27340a96de45049b6714636ef2d")
                 .unwrap();
 
             state.sync_progress(0.4).unwrap();

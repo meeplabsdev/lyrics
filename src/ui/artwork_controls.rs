@@ -1,5 +1,5 @@
 use crate::{colour::Colour, state::State};
-use eframe::egui::{Image, Pos2, Rect, Sense, Stroke, Vec2, Widget, include_image};
+use eframe::egui::{Image, Pos2, Rect, Sense, Stroke, StrokeKind, Vec2, Widget, include_image};
 
 #[derive(Debug, Clone, Copy)]
 pub enum RepeatMode {
@@ -119,6 +119,23 @@ impl Widget for &mut ArtworkControls {
                 response.mark_changed();
             }
         }
+
+        painter.rect(
+            Rect::from_center_size(
+                Pos2::new(
+                    rect.left() + (rect.width() / 2.0),
+                    rect.bottom() - (rect.height() / 15.0),
+                ),
+                Vec2::new(
+                    rect.width() / 20.0 * 12.5,
+                    rect.width() / 20.0 * 20.0 / 10.0,
+                ),
+            ),
+            rect.width() / 20.0,
+            Colour::from_rgba(0, 0, 0, 50),
+            Stroke::NONE,
+            StrokeKind::Outside,
+        );
 
         if self.playing {
             Image::new(include_image!("../../assets/pause.svg"))
