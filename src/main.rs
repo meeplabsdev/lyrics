@@ -75,6 +75,12 @@ impl LyricsApp {
             Event::PlayingSync { playing } => {
                 self.artwork_controls.set_playing(playing);
             }
+            Event::ShuffleSync { shuffle } => {
+                self.artwork_controls.set_shuffle(shuffle);
+            }
+            Event::RepeatSync { repeat } => {
+                self.artwork_controls.set_repeat(repeat);
+            }
             _ => {}
         }
 
