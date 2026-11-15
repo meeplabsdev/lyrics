@@ -10,11 +10,15 @@ This is a project I started on week 3 of [Terra](https://terra.hackclub.com/). I
 - Release year
 - Song cover thumbnail
 - Track scrub/seek
+- Play/Pause
+- Prev/Next
+- Shuffle/Repeat
+- Dynamic background ported from kawarp
 
 It is missing:
 - Volume
-- Play/pause
 - Lyrics
+- Queue/Playlist
 
 # Demo
 
