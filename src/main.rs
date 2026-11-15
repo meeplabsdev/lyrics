@@ -176,7 +176,7 @@ fn main() -> eframe::Result {
                 .unwrap();
 
             state.sync_progress(0.4).unwrap();
-            state.set_playing(true).unwrap();
+            state.sync_playing(true).unwrap();
 
             Ok(Box::new(app))
         }),

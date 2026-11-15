@@ -1,4 +1,4 @@
-use crate::colour::Colour;
+use crate::{colour::Colour, ui::artwork_controls::RepeatMode};
 use anyhow::Result;
 use color_thief::ColorFormat;
 use eframe::egui::ColorImage;
@@ -29,6 +29,18 @@ pub enum Event {
     },
     PlayingSync {
         playing: bool,
+    },
+    ShuffleChanged {
+        shuffle: bool,
+    },
+    ShuffleSync {
+        shuffle: bool,
+    },
+    RepeatChanged {
+        repeat: RepeatMode,
+    },
+    RepeatSync {
+        repeat: RepeatMode,
     },
     NextTrack,
     PreviousTrack,
@@ -132,6 +144,34 @@ impl State {
     pub fn sync_playing(&mut self, playing: bool) -> Result<(), SendError<Event>> {
         paris::log!("Synced playing to {playing}");
         self.tx.send(Event::PlayingSync { playing })?;
+
+        Ok(())
+    }
+
+    pub fn set_shuffle(&mut self, shuffle: bool) -> Result<(), SendError<Event>> {
+        paris::log!("Set shuffle to {shuffle}");
+        self.tx.send(Event::ShuffleChanged { shuffle })?;
+
+        Ok(())
+    }
+
+    pub fn sync_shuffle(&mut self, shuffle: bool) -> Result<(), SendError<Event>> {
+        paris::log!("Synced shuffle to {shuffle}");
+        self.tx.send(Event::ShuffleSync { shuffle })?;
+
+        Ok(())
+    }
+
+    pub fn set_repeat(&mut self, repeat: RepeatMode) -> Result<(), SendError<Event>> {
+        paris::log!("Set repeat to {repeat:?}");
+        self.tx.send(Event::RepeatChanged { repeat })?;
+
+        Ok(())
+    }
+
+    pub fn sync_repeat(&mut self, repeat: RepeatMode) -> Result<(), SendError<Event>> {
+        paris::log!("Synced repeat to {repeat:?}");
+        self.tx.send(Event::RepeatSync { repeat })?;
 
         Ok(())
     }
