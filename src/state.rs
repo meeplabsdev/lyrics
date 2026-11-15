@@ -16,11 +16,22 @@ pub enum Event {
     ProgressChanged {
         progress: f32,
     },
+    ProgressSync {
+        progress: f32,
+    },
     ArtworkChanged {
         name: String,
         image: ColorImage,
         colours: Vec<Colour>,
     },
+    PlayingChanged {
+        playing: bool,
+    },
+    PlayingSync {
+        playing: bool,
+    },
+    NextTrack,
+    PreviousTrack,
 }
 
 pub struct State {
@@ -67,6 +78,13 @@ impl State {
         Ok(())
     }
 
+    pub fn sync_progress(&mut self, progress: f32) -> Result<(), SendError<Event>> {
+        paris::log!("Synced progress to {progress}");
+        self.tx.send(Event::ProgressSync { progress })?;
+
+        Ok(())
+    }
+
     pub fn set_artwork(&mut self, uri: impl Into<String>) -> Result<()> {
         let uri = uri.into();
 
@@ -100,6 +118,34 @@ impl State {
             image,
             colours,
         })?;
+
+        Ok(())
+    }
+
+    pub fn set_playing(&mut self, playing: bool) -> Result<(), SendError<Event>> {
+        paris::log!("Set playing to {playing}");
+        self.tx.send(Event::PlayingChanged { playing })?;
+
+        Ok(())
+    }
+
+    pub fn sync_playing(&mut self, playing: bool) -> Result<(), SendError<Event>> {
+        paris::log!("Synced playing to {playing}");
+        self.tx.send(Event::PlayingSync { playing })?;
+
+        Ok(())
+    }
+
+    pub fn next_track(&mut self) -> Result<(), SendError<Event>> {
+        paris::log!("Triggered next track");
+        self.tx.send(Event::NextTrack)?;
+
+        Ok(())
+    }
+
+    pub fn prev_track(&mut self) -> Result<(), SendError<Event>> {
+        paris::log!("Triggered previous track");
+        self.tx.send(Event::PreviousTrack)?;
 
         Ok(())
     }

@@ -10,8 +10,8 @@ use crate::{
     layout::Layout,
     state::{Event, State},
     ui::{
-        artist::Artist, artwork::Artwork, controls::Controls, dynamic_bg::DynamicBg,
-        lyrics::Lyrics, title::Title,
+        artist::Artist, artwork::Artwork, artwork_controls::ArtworkControls, controls::Controls,
+        dynamic_bg::DynamicBg, lyrics::Lyrics, title::Title,
     },
     utils::PutClipped,
 };
@@ -24,24 +24,26 @@ use eframe::{
 pub const WINDOW_SIZE: [f32; 2] = [1024.0, 600.0];
 
 struct LyricsApp {
-    state: State,
     bg: DynamicBg,
-    controls: Controls,
     artwork: Artwork,
-    lyrics: Lyrics,
+    controls: Controls,
+    artwork_controls: ArtworkControls,
     title: Title,
     artist: Artist,
+    lyrics: Lyrics,
+    state: State,
 }
 
 impl LyricsApp {
     fn new<'a>(cc: &'a eframe::CreationContext<'a>, state: State) -> Result<Self> {
         Ok(Self {
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
-            controls: Controls::new(state.clone()),
             artwork: Artwork::new(),
-            lyrics: Lyrics::new(),
+            controls: Controls::new(state.clone()),
+            artwork_controls: ArtworkControls::new(state.clone()),
             title: Title::new(),
             artist: Artist::new(),
+            lyrics: Lyrics::new(),
             state,
         })
     }
@@ -59,6 +61,9 @@ impl LyricsApp {
                 self.controls.set_progress(0.0);
                 self.title.set_title(title);
             }
+            Event::ProgressSync { progress } => {
+                self.controls.set_progress(progress);
+            }
             Event::ArtworkChanged {
                 name,
                 image,
@@ -66,6 +71,9 @@ impl LyricsApp {
             } => {
                 self.artwork.set_image(name, image);
                 self.bg.set_colours(colours);
+            }
+            Event::PlayingSync { playing } => {
+                self.artwork_controls.set_playing(playing);
             }
             _ => {}
         }
@@ -91,6 +99,7 @@ impl eframe::App for LyricsApp {
 
                 ui.putc(layout.artwork, &mut self.artwork);
                 ui.putc(layout.controls, &mut self.controls);
+                ui.putc(layout.artwork_controls, &mut self.artwork_controls);
                 ui.putc(layout.title, &mut self.title);
                 ui.putc(layout.artist, &mut self.artist);
                 ui.putc(layout.lyrics, &mut self.lyrics);
@@ -162,11 +171,12 @@ fn main() -> eframe::Result {
                 )
                 .unwrap();
 
-            state.set_progress(0.4).unwrap();
-
             state
                 .set_artwork("https://i.scdn.co/image/ab67616d0000b27320754a1128d65c6b9688ea3d")
                 .unwrap();
+
+            state.sync_progress(0.4).unwrap();
+            state.set_playing(true).unwrap();
 
             Ok(Box::new(app))
         }),

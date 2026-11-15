@@ -2,6 +2,7 @@ use eframe::egui::{Pos2, Rect, Vec2};
 
 pub struct Layout {
     pub artwork: Rect,
+    pub artwork_controls: Rect,
     pub controls: Rect,
     pub title: Rect,
     pub artist: Rect,
@@ -25,6 +26,8 @@ impl Layout {
             Vec2::new(artwork_scale, artwork_scale),
         );
 
+        let artwork_controls = artwork.scale_from_center(0.95);
+
         let controls = Rect::from_min_size(
             artwork.left_bottom() + Vec2::new(-16.0, 8.0),
             Vec2::new(artwork.width() + 32.0, screen_h / 25.0),
@@ -42,6 +45,7 @@ impl Layout {
 
         Self {
             artwork,
+            artwork_controls,
             controls,
             title,
             artist,
