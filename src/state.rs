@@ -24,6 +24,9 @@ pub enum Event {
         image: ColorImage,
         colours: Vec<Colour>,
     },
+    LyricsChanged {
+        lyrics: Vec<String>,
+    },
     PlayingChanged {
         playing: bool,
     },
@@ -86,6 +89,7 @@ impl State {
     pub fn set_progress(&mut self, progress: f32) -> Result<(), SendError<Event>> {
         paris::log!("Set progress to {progress}");
         self.tx.send(Event::ProgressChanged { progress })?;
+        self.tx.send(Event::ProgressSync { progress })?;
 
         Ok(())
     }
@@ -134,9 +138,17 @@ impl State {
         Ok(())
     }
 
+    pub fn set_lyrics(&mut self, lyrics: Vec<String>) -> Result<(), SendError<Event>> {
+        paris::log!("Set lyrics ({} lines)", lyrics.len());
+        self.tx.send(Event::LyricsChanged { lyrics })?;
+
+        Ok(())
+    }
+
     pub fn set_playing(&mut self, playing: bool) -> Result<(), SendError<Event>> {
         paris::log!("Set playing to {playing}");
         self.tx.send(Event::PlayingChanged { playing })?;
+        self.tx.send(Event::PlayingSync { playing })?;
 
         Ok(())
     }
@@ -151,6 +163,7 @@ impl State {
     pub fn set_shuffle(&mut self, shuffle: bool) -> Result<(), SendError<Event>> {
         paris::log!("Set shuffle to {shuffle}");
         self.tx.send(Event::ShuffleChanged { shuffle })?;
+        self.tx.send(Event::ShuffleSync { shuffle })?;
 
         Ok(())
     }
@@ -165,6 +178,7 @@ impl State {
     pub fn set_repeat(&mut self, repeat: RepeatMode) -> Result<(), SendError<Event>> {
         paris::log!("Set repeat to {repeat:?}");
         self.tx.send(Event::RepeatChanged { repeat })?;
+        self.tx.send(Event::RepeatSync { repeat })?;
 
         Ok(())
     }
