@@ -19,7 +19,10 @@ impl Layout {
         let artwork_scale = screen.width() / 3.2;
         let artwork_offset = (center_x - artwork_scale) / 2.0;
 
-        let lyrics = Rect::from_min_max(Pos2::new(center_x, 0.0), Pos2::new(screen_w, screen_h));
+        let lyrics = Rect::from_min_max(
+            Pos2::new(center_x, 0.0),
+            Pos2::new(screen_w * 0.95, screen_h),
+        );
 
         let artwork = Rect::from_min_size(
             Pos2::new(artwork_offset, artwork_offset),
