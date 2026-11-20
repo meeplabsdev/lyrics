@@ -2,16 +2,19 @@
 
 mod colour;
 mod layout;
+mod logic;
 mod state;
 mod ui;
 mod utils;
 
 use crate::{
     layout::Layout,
-    state::{Event, State},
+    logic::Logic,
+    state::{AppState, Event, State},
     ui::{
         artist::Artist, artwork::Artwork, artwork_controls::ArtworkControls, controls::Controls,
-        dynamic_bg::DynamicBg, lyrics::Lyrics, title::Title,
+        dynamic_bg::DynamicBg, lyrics::Lyrics, qr_instructions::QrInstructions, qrcode::QrCode,
+        title::Title,
     },
     utils::PutClipped,
 };
@@ -20,36 +23,58 @@ use eframe::{
     egui::{self, FontData, FontFamily},
     epaint::text::{FontInsert, FontPriority, InsertFontFamily},
 };
+use tokio::{runtime::Runtime, task::JoinHandle};
 
 pub const WINDOW_SIZE: [f32; 2] = [1024.0, 600.0];
 
 struct LyricsApp {
     bg: DynamicBg,
+    qrcode: QrCode,
+    qr_instructions: QrInstructions,
     artwork: Artwork,
     controls: Controls,
     artwork_controls: ArtworkControls,
     title: Title,
     artist: Artist,
     lyrics: Lyrics,
+
+    app_state: AppState,
     state: State,
+    logic: JoinHandle<Result<()>>,
 }
 
 impl LyricsApp {
-    fn new<'a>(cc: &'a eframe::CreationContext<'a>, state: State) -> Result<Self> {
+    fn new<'a>(
+        cc: &'a eframe::CreationContext<'a>,
+        state: State,
+        logic: JoinHandle<Result<()>>,
+    ) -> Result<Self> {
         Ok(Self {
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
+            qrcode: QrCode::new(),
+            qr_instructions: QrInstructions::new(),
             artwork: Artwork::new(),
             controls: Controls::new(state.clone()),
             artwork_controls: ArtworkControls::new(state.clone()),
             title: Title::new(),
             artist: Artist::new(),
             lyrics: Lyrics::new(),
+
+            app_state: AppState::Loading,
             state,
+            logic,
         })
     }
 
     fn handle_event(&mut self, event: Event, ui: &mut egui::Ui) {
         match event {
+            Event::AppStateChanged { app_state } => {
+                self.app_state = app_state;
+            }
+            Event::LoginChanged { qr, code } => {
+                self.qrcode.set_image(qr);
+                self.qr_instructions.set_code(code);
+            }
             Event::TrackChanged {
                 title,
                 artist,
@@ -108,13 +133,26 @@ impl eframe::App for LyricsApp {
                 let layout = Layout::new(ui.available_rect_before_wrap());
                 ui.add(&mut self.bg);
 
-                ui.putc(layout.artwork, &mut self.artwork);
-                ui.putc(layout.controls, &mut self.controls);
-                ui.putc(layout.artwork_controls, &mut self.artwork_controls);
-                ui.putc(layout.title, &mut self.title);
-                ui.putc(layout.artist, &mut self.artist);
-                ui.putc(layout.lyrics, &mut self.lyrics);
+                match self.app_state {
+                    AppState::Loading => {}
+                    AppState::Login => {
+                        ui.putc(layout.qrcode, &mut self.qrcode);
+                        ui.putc(layout.qr_instructions, &mut self.qr_instructions);
+                    }
+                    AppState::Ready => {
+                        ui.putc(layout.artwork, &mut self.artwork);
+                        ui.putc(layout.controls, &mut self.controls);
+                        ui.putc(layout.artwork_controls, &mut self.artwork_controls);
+                        ui.putc(layout.title, &mut self.title);
+                        ui.putc(layout.artist, &mut self.artist);
+                        ui.putc(layout.lyrics, &mut self.lyrics);
+                    }
+                }
             });
+    }
+
+    fn on_exit(&mut self) {
+        self.logic.abort();
     }
 }
 
@@ -127,6 +165,10 @@ fn main() -> eframe::Result {
             .with_decorations(false),
         ..Default::default()
     };
+
+    let state = State::new();
+    let runtime = Runtime::new().unwrap();
+    let logic = Logic::new(state.clone());
 
     eframe::run_native(
         "Lyrics",
@@ -170,30 +212,9 @@ fn main() -> eframe::Result {
                 }],
             ));
 
-            let mut state = State::new();
-            let app = LyricsApp::new(cc, state.clone())?;
-
-            state
-                .set_track("Honestly", "THØRNS, Kasane Teto", 2024, 218)
-                .unwrap();
-
-            state
-                .set_artwork("https://i.scdn.co/image/ab67616d0000b27340a96de45049b6714636ef2d")
-                .unwrap();
-
-            state.set_lyrics(vec![
-                String::from("Line 1"),
-                String::from("Line 2 but its longer"),
-                String::from(
-                    "Line 3 and its reeeaaaalllly long WOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO hi",
-                ),
-                String::from(
-                    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-                ),
-            ]).unwrap();
-
-            state.sync_progress(0.4).unwrap();
-            state.sync_playing(true).unwrap();
+            let app_state = state.clone();
+            let handle = logic.spawn(runtime.handle());
+            let app = LyricsApp::new(cc, app_state, handle)?;
 
             Ok(Box::new(app))
         }),

@@ -11,6 +11,7 @@ eframe = "0.35.0"
 egui_extras = { version = "0.35.0", features = ["all_loaders"] }
 image = { version = "0.25.10" }
 paris = { version = "1.5.15", features = ["macros", "timestamps"] }
+qrcode = "0.15.0"
 reqwest = { version = "0.13.5", features = ["blocking", "brotli", "deflate", "form", "gzip", "json", "multipart", "query", "stream", "zstd"] }
 rgb = "0.8.53"
 tokio = { version = "1.54.1", features = ["macros","rt-multi-thread","time"] }

@@ -2,11 +2,33 @@ use crate::{colour::Colour, ui::artwork_controls::RepeatMode};
 use anyhow::Result;
 use color_thief::ColorFormat;
 use eframe::egui::ColorImage;
-use tokio::sync::broadcast::{self, error::SendError};
+use image::Rgba;
+use qrcode::{EcLevel, bits, canvas::Canvas, ec, render::Renderer};
+use tokio::sync::broadcast::{
+    self,
+    error::{RecvError, SendError, TryRecvError},
+};
 
-// TODO: PlayingChanged
+#[derive(Debug, Clone)]
+pub enum AppState {
+    Loading,
+    Login,
+    Ready,
+}
+
 #[derive(Debug, Clone)]
 pub enum Event {
+    AppStateChanged {
+        app_state: AppState,
+    },
+
+    // Login
+    LoginChanged {
+        qr: ColorImage,
+        code: String,
+    },
+
+    // Ready
     TrackChanged {
         title: String,
         artist: String,
@@ -61,8 +83,51 @@ impl State {
         Self { tx, rx }
     }
 
-    pub fn event(&mut self) -> Result<Event, broadcast::error::TryRecvError> {
+    pub fn event(&mut self) -> Result<Event, TryRecvError> {
         self.rx.try_recv()
+    }
+
+    pub async fn wait_event(&mut self) -> Result<Event, RecvError> {
+        self.rx.recv().await
+    }
+
+    pub fn set_app_state(&mut self, app_state: AppState) -> Result<(), SendError<Event>> {
+        paris::log!("Set app state to {app_state:?}");
+        self.tx.send(Event::AppStateChanged { app_state })?;
+
+        Ok(())
+    }
+
+    pub fn set_login(&mut self, code: String) -> Result<()> {
+        let bits = bits::encode_auto(
+            format!("https://spotify.com/pair?code={code}").as_bytes(),
+            EcLevel::H,
+        )?;
+        let version = bits.version();
+        let data = bits.into_bytes();
+        let (encoded_data, ec_data) = ec::construct_codewords(&data, version, EcLevel::H)?;
+
+        let mut canvas = Canvas::new(version, EcLevel::H);
+        canvas.draw_all_functional_patterns();
+        canvas.draw_data(&encoded_data, &ec_data);
+
+        let canvas = canvas.apply_best_mask();
+        let qrcode =
+            Renderer::<Rgba<u8>>::new(&canvas.into_colors(), version.width() as usize, 1).build();
+
+        let size = [qrcode.width() as usize, qrcode.height() as usize];
+        let pixels = qrcode.into_raw();
+        let qr = ColorImage::from_rgba_unmultiplied(size, &pixels);
+
+        paris::log!("Set login code to {code}");
+        self.tx.send(Event::LoginChanged { qr, code })?;
+        self.tx.send(Event::ArtworkChanged {
+            name: "QrCode".into(),
+            image: ColorImage::from_rgba_unmultiplied([1, 1], &Colour::WEAK.into_array_u8()),
+            colours: vec![Colour::WHITE, Colour::BLACK],
+        })?;
+
+        Ok(())
     }
 
     pub fn set_track(
@@ -101,11 +166,11 @@ impl State {
         Ok(())
     }
 
-    pub fn set_artwork(&mut self, uri: impl Into<String>) -> Result<()> {
+    pub async fn set_artwork(&mut self, uri: impl Into<String>) -> Result<()> {
         let uri = uri.into();
 
-        let resp = reqwest::blocking::get(&uri)?.error_for_status()?;
-        let bytes = resp.bytes()?;
+        let resp = reqwest::get(&uri).await?.error_for_status()?;
+        let bytes = resp.bytes().await?;
 
         let image = image::load_from_memory(&bytes)?;
         let rgba = image.to_rgba8();

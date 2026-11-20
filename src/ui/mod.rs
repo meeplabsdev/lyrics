@@ -4,4 +4,6 @@ pub mod artwork_controls;
 pub mod controls;
 pub mod dynamic_bg;
 pub mod lyrics;
+pub mod qr_instructions;
+pub mod qrcode;
 pub mod title;

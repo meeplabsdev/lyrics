@@ -1,6 +1,8 @@
 use eframe::egui::{Pos2, Rect, Vec2};
 
 pub struct Layout {
+    pub qrcode: Rect,
+    pub qr_instructions: Rect,
     pub artwork: Rect,
     pub artwork_controls: Rect,
     pub controls: Rect,
@@ -19,9 +21,14 @@ impl Layout {
         let artwork_scale = screen.width() / 3.2;
         let artwork_offset = (center_x - artwork_scale) / 2.0;
 
-        let lyrics = Rect::from_min_max(
-            Pos2::new(center_x, 0.0),
-            Pos2::new(screen_w * 0.95, screen_h),
+        let qrcode = Rect::from_min_size(
+            Pos2::new(center_x - artwork_scale / 2.0, artwork_offset),
+            Vec2::new(artwork_scale, artwork_scale),
+        );
+
+        let qr_instructions = Rect::from_min_size(
+            qrcode.left_bottom() + Vec2::new(-8.0, 8.0),
+            Vec2::new(qrcode.width() + 32.0, screen_h / 12.0),
         );
 
         let artwork = Rect::from_min_size(
@@ -46,7 +53,14 @@ impl Layout {
             Vec2::new(controls.width() - 16.0, screen_h / 30.0),
         );
 
+        let lyrics = Rect::from_min_max(
+            Pos2::new(center_x, 0.0),
+            Pos2::new(screen_w * 0.95, screen_h),
+        );
+
         Self {
+            qrcode,
+            qr_instructions,
             artwork,
             artwork_controls,
             controls,
