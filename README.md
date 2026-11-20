@@ -33,3 +33,7 @@ If you want to test it on windows, (I cannot confirm if this works on not), or i
 - `git clone https://github.com/meeplabsdev/lyrics.git`
 - `cd lyrics`
 - `cargo run --release`
+
+# Nix
+
+For running on nixos, I have written a flake. It can be used like `nix run github:meeplabsdev/lyrics`
