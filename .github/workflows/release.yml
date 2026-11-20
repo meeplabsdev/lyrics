@@ -20,16 +20,35 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-musl
             binary: lyrics
+            artifact: lyrics-linux-x86_64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            binary: lyrics
+            artifact: lyrics-linux-aarch64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             binary: lyrics.exe
+            artifact: lyrics-windows-x86_64
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux build prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Install AArch64 musl cross-compiler
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: |
+          curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz \
+            | sudo tar xz -C /opt
+          echo "/opt/aarch64-linux-musl-cross/bin" >> "$GITHUB_PATH"
 
       - name: Set rustup toolchain
         run: |
@@ -44,11 +63,17 @@ jobs:
 
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CC_x86_64_unknown_linux_musl: musl-gcc
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-musl-gcc
+          CC_aarch64_unknown_linux_musl: aarch64-linux-musl-gcc
+          AR_aarch64_unknown_linux_musl: aarch64-linux-musl-ar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lyrics-${{ matrix.os }}
+          name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
             target/${{ matrix.target }}/release/${{ matrix.binary }}
@@ -59,16 +84,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Linux artifact
+      - name: Download Linux x86_64 artifact
         uses: actions/download-artifact@v4
         with:
-          name: lyrics-ubuntu-latest
-          path: release/linux
+          name: lyrics-linux-x86_64
+          path: release/linux-x86_64
+
+      - name: Download Linux aarch64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: lyrics-linux-aarch64
+          path: release/linux-aarch64
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
-          name: lyrics-windows-latest
+          name: lyrics-windows-x86_64
           path: release/windows
 
       - name: Publish GitHub release
@@ -79,5 +110,6 @@ jobs:
           prerelease: true
           generate_release_notes: true
           files: |
-            release/linux/lyrics
+            release/linux-x86_64/lyrics
+            release/linux-aarch64/lyrics
             release/windows/lyrics.exe
