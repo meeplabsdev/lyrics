@@ -19,12 +19,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
             binary: lyrics
             artifact: lyrics-linux-x86_64
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-musl
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
             binary: lyrics
             artifact: lyrics-linux-aarch64
           - os: windows-latest
@@ -36,19 +36,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Linux build prerequisites
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-
-      - name: Install AArch64 musl cross-compiler
-        if: matrix.target == 'aarch64-unknown-linux-musl'
-        run: |
-          curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz \
-            | sudo tar xz -C /opt
-          echo "/opt/aarch64-linux-musl-cross/bin" >> "$GITHUB_PATH"
 
       - name: Set rustup toolchain
         run: |
@@ -63,12 +50,6 @@ jobs:
 
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
-        env:
-          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-          CC_x86_64_unknown_linux_musl: musl-gcc
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-musl-gcc
-          CC_aarch64_unknown_linux_musl: aarch64-linux-musl-gcc
-          AR_aarch64_unknown_linux_musl: aarch64-linux-musl-ar
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -102,6 +83,12 @@ jobs:
           name: lyrics-windows-x86_64
           path: release/windows
 
+      - name: Rename assets
+        run: |
+          mv release/linux-x86_64/lyrics release/lyrics-linux-x86_64
+          mv release/linux-aarch64/lyrics release/lyrics-linux-aarch64
+          mv release/windows/lyrics.exe release/lyrics-windows-x86_64.exe
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -110,6 +97,6 @@ jobs:
           prerelease: true
           generate_release_notes: true
           files: |
-            release/linux-x86_64/lyrics
-            release/linux-aarch64/lyrics
-            release/windows/lyrics.exe
+            release/lyrics-linux-x86_64
+            release/lyrics-linux-aarch64
+            release/lyrics-windows-x86_64.exe
