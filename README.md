@@ -1,6 +1,6 @@
 # Lyrics
 
-https://github.com/user-attachments/assets/32908b58-635a-4530-9cda-c166dd8e1e28
+https://github.com/user-attachments/assets/6b72b98e-3c21-455d-ad0a-c51c5292b15a
 
 # How
 
@@ -22,13 +22,11 @@ It is missing:
 
 # Demo
 
-I can only build the project for linux at this point in time, so you will only find releases for linux, but it should run perfectly fine on windows or mac aswell, or even webasm with some effort put in. To build it from source is extremely simple, since all you need to do is enter the directory and run `cargo run` or `cargo build` (and obviously you need rust/cargo installed).
-
-When running the release, if you have an error like "cannot execute: required file not found", it is because the compiled program relies on some system libraries that are not present on your system. In this case, you must build it from scratch rather than using the release (see below).
+Prebuilt binaries can be found for linux (both x86 and arm) and for windows (x86 only) under the releases. On linux, you may have to run `chmod +x lyrics*` to make it executable, but then it can be executed without any other special requirements (provided you are on a supported desktop environment).
 
 # Building
 
-If you want to test it on windows, (I cannot confirm if this works on not), or if the release does not work for you, you must build it yourself. You must have rust/cargo installed, and run `cargo run` or `cargo build` inside the project directory (the one with `Cargo.toml`). The output will be `target/debug/lyrics(.exe)`. Optionally you can build with `--release` for an optimised build, which will be output to `target/release/lyrics(.exe)`. There are no external dependencies not handled by cargo.
+If the release does not work for you or you are on an unsupported platform, you must build it yourself. You must have rust/cargo installed, and run `cargo run` or `cargo build` inside the project directory (the one with `Cargo.toml`). The output will be `target/debug/lyrics(.exe)`. Optionally you can build with `--release` for an optimised build, which will be output to `target/release/lyrics(.exe)`. There are no external dependencies that are not handled by cargo.
 
 - `git clone https://github.com/meeplabsdev/lyrics.git`
 - `cd lyrics`
@@ -36,4 +34,4 @@ If you want to test it on windows, (I cannot confirm if this works on not), or i
 
 # Nix
 
-For running on nixos, I have written a flake. It can be used like `nix run github:meeplabsdev/lyrics`
+For running on nixos, I have written a flake. It can be used like `nix run github:meeplabsdev/lyrics`, which will automatically set up the correct environment (but you still need to be on a supported desktop environment).
