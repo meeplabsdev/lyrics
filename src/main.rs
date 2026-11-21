@@ -8,6 +8,7 @@ mod ui;
 mod utils;
 
 use crate::{
+    colour::Colour,
     layout::Layout,
     logic::Logic,
     state::{AppState, Event, State},
@@ -20,7 +21,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use eframe::{
-    egui::{self, FontData, FontFamily},
+    egui::{self, FontData, FontFamily, Spinner},
     epaint::text::{FontInsert, FontPriority, InsertFontFamily},
 };
 use tokio::{runtime::Runtime, task::JoinHandle};
@@ -49,7 +50,7 @@ impl LyricsApp {
         state: State,
         logic: JoinHandle<Result<()>>,
     ) -> Result<Self> {
-        Ok(Self {
+        let mut this = Self {
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
             qrcode: QrCode::new(),
             qr_instructions: QrInstructions::new(),
@@ -63,7 +64,14 @@ impl LyricsApp {
             app_state: AppState::Loading,
             state,
             logic,
-        })
+        };
+
+        this.bg.set_colours(vec![
+            Colour::from_rgb(30, 30, 30),
+            Colour::from_rgb(10, 10, 10),
+        ]);
+
+        Ok(this)
     }
 
     fn handle_event(&mut self, event: Event, ui: &mut egui::Ui) {
@@ -134,7 +142,9 @@ impl eframe::App for LyricsApp {
                 ui.add(&mut self.bg);
 
                 match self.app_state {
-                    AppState::Loading => {}
+                    AppState::Loading => {
+                        Spinner::new().paint_at(ui, layout.spinner);
+                    }
                     AppState::Login => {
                         ui.putc(layout.qrcode, &mut self.qrcode);
                         ui.putc(layout.qr_instructions, &mut self.qr_instructions);
@@ -157,6 +167,10 @@ impl eframe::App for LyricsApp {
 }
 
 fn main() -> eframe::Result {
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("failed to install rustls crypto provider");
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size(WINDOW_SIZE)

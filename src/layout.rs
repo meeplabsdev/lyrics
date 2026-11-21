@@ -1,6 +1,7 @@
 use eframe::egui::{Pos2, Rect, Vec2};
 
 pub struct Layout {
+    pub spinner: Rect,
     pub qrcode: Rect,
     pub qr_instructions: Rect,
     pub artwork: Rect,
@@ -20,6 +21,9 @@ impl Layout {
         let center_x = screen_w / 2.0;
         let artwork_scale = screen.width() / 3.2;
         let artwork_offset = (center_x - artwork_scale) / 2.0;
+
+        let spinner =
+            Rect::from_center_size(screen.center(), Vec2::new(screen_w / 15.0, screen_w / 15.0));
 
         let qrcode = Rect::from_min_size(
             Pos2::new(center_x - artwork_scale / 2.0, artwork_offset),
@@ -59,6 +63,7 @@ impl Layout {
         );
 
         Self {
+            spinner,
             qrcode,
             qr_instructions,
             artwork,
