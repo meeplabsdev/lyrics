@@ -1,8 +1,9 @@
 use crate::logic::{access_token::AccessToken, apresolve::APResolve};
 use anyhow::{Context, Result, anyhow};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use futures_util::{SinkExt, StreamExt};
 use librespot_protocol::connect::{
-    Capabilities, Cluster, Device, DeviceInfo, MemberType, PutStateRequest,
+    Capabilities, Cluster, ClusterUpdate, Device, DeviceInfo, MemberType, PutStateRequest,
 };
 use protobuf::{Message, MessageField};
 use reqwest::{
@@ -11,19 +12,26 @@ use reqwest::{
 };
 use serde_json::Value;
 use sha1::{Digest, Sha1};
-use std::{collections::HashMap, fs};
-use tokio::net::TcpStream;
+use std::{collections::HashMap, fs, time::Duration};
+use tokio::{net::TcpStream, sync::Mutex};
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async,
     tungstenite::{self, client::IntoClientRequest},
 };
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 struct DealerMessage {
+    #[serde(default)]
     headers: HashMap<String, Value>,
+    #[serde(default)]
+    payloads: Vec<String>,
     // method: String,
-    // r#type: String,
-    // uri: String,
+    r#type: String,
+    uri: String,
+}
+
+pub enum Event {
+    Update { image_url: String, title: String },
 }
 
 pub struct Spotify {
@@ -32,7 +40,7 @@ pub struct Spotify {
     apresolve: APResolve,
     device: [u8; 20],
     connection: Option<String>,
-    dealer: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    dealer: Option<Mutex<WebSocketStream<MaybeTlsStream<TcpStream>>>>,
     cluster: Option<Cluster>,
 }
 
@@ -81,6 +89,53 @@ impl Spotify {
         Ok(this)
     }
 
+    pub async fn wait_event(&self) -> Result<Event> {
+        let Some(ref stream) = self.dealer else {
+            return Err(anyhow!("no available stream"));
+        };
+
+        loop {
+            let msg = serde_json::from_str::<DealerMessage>(
+                stream
+                    .lock()
+                    .await
+                    .select_next_some()
+                    .await?
+                    .into_text()?
+                    .as_str(),
+            )?;
+
+            if msg.r#type == "pong" {
+                continue;
+            }
+
+            if msg.uri != "hm://connect-state/v1/cluster" {
+                continue;
+            }
+
+            for payload in msg.payloads {
+                let bytes = BASE64_STANDARD.decode(payload)?;
+                let update = ClusterUpdate::parse_from_bytes(&bytes)?;
+                let metadata = update.cluster.player_state.track.metadata.clone();
+
+                return Ok(Event::Update {
+                    image_url: format!(
+                        "https://i.scdn.co/image/{}",
+                        metadata
+                            .get("image_url")
+                            .context("cluster had no image url")?
+                            .strip_prefix("spotify:image:")
+                            .context("image url did not start with spotify:image:")?
+                    ),
+                    title: metadata
+                        .get("title")
+                        .context("cluster had no title")?
+                        .to_string(),
+                });
+            }
+        }
+    }
+
     pub async fn next_track(&self) -> Result<()> {
         paris::warn!("TODO: next_track");
 
@@ -91,6 +146,21 @@ impl Spotify {
         paris::warn!("TODO: prev_track");
 
         Ok(())
+    }
+
+    pub async fn ping_loop(&self) -> Result<()> {
+        loop {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            let Some(ref stream) = self.dealer else {
+                continue;
+            };
+
+            stream
+                .lock()
+                .await
+                .send(tungstenite::Message::Text("{\"type\":\"ping\"}".into()))
+                .await?;
+        }
     }
 
     async fn create_dealer_socket(&mut self) -> Result<()> {
@@ -118,13 +188,8 @@ impl Spotify {
                 .to_string(),
         );
 
-        // TODO: ping every 30 seconds
         paris::log!("Connected with id {:?}", self.connection);
-        stream
-            .send(tungstenite::Message::Text("{\"type\":\"ping\"}".into()))
-            .await?;
-
-        self.dealer = Some(stream);
+        self.dealer = Some(Mutex::new(stream));
 
         Ok(())
     }
@@ -171,6 +236,7 @@ impl Spotify {
             .error_for_status()?;
 
         let cluster = Cluster::parse_from_bytes(&res.bytes().await?)?;
+        // TODO: switch to event broadcast::channel and push to that instead of using cluster property
         self.cluster = Some(cluster);
         paris::log!("Got cluster {:#?}", self.cluster);
 

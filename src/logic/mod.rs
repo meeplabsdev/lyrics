@@ -7,12 +7,17 @@ mod spotify;
 pub const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 
 use crate::{
-    logic::{access_token::AccessToken, device_login::DeviceLogin, spotify::Spotify},
+    logic::{
+        access_token::AccessToken,
+        device_login::DeviceLogin,
+        spotify::{Event as SEvent, Spotify},
+    },
     state::{AppState, Event, State},
 };
 use anyhow::{Result, anyhow};
+use futures_util::{FutureExt, select};
 use reqwest::Client;
-use std::fs;
+use std::{fs, sync::Arc};
 use tokio::{runtime::Handle, task::JoinHandle};
 
 pub struct Logic {
@@ -68,25 +73,36 @@ impl Logic {
 
         fs::write("spotify.token", access_token.store()?)?;
         paris::log!("Signed in with {access_token:?}");
-        let spotify = Spotify::new(client, access_token).await?;
+        let spotify = Arc::new(Spotify::new(client, access_token).await?);
+        let spotify_ping_loop = spotify.clone();
+        tokio::spawn(async move { spotify_ping_loop.ping_loop().await });
 
         self.state.set_app_state(AppState::Ready)?;
 
-        self.state
-            .set_track("Honestly", "THØRNS, Kasane Teto", 2024, 218)?;
-
-        self.state
-            .set_artwork("https://i.scdn.co/image/ab67616d0000b27340a96de45049b6714636ef2d")
-            .await?;
-
-        self.state.sync_progress(0.4)?;
-        self.state.sync_playing(true)?;
+        self.state.set_progress(0.4)?;
+        self.state.set_playing(true)?;
 
         loop {
-            match self.state.wait_event().await? {
-                Event::NextTrack => spotify.next_track().await?,
-                Event::PreviousTrack => spotify.prev_track().await?,
-                _ => {}
+            select! {
+                event = self.state.wait_event().fuse() => {
+                    match event? {
+                        Event::NextTrack => spotify.next_track().await?,
+                        Event::PreviousTrack => spotify.prev_track().await?,
+                        _ => {}
+                    };
+                }
+                event = spotify.wait_event().fuse() => {
+                    match event? {
+                        SEvent::Update { image_url, title } => {
+                            self.state
+                                .set_artwork(image_url)
+                                .await?;
+
+                            self.state
+                                .set_track(title, "", 0, 0)?;
+                        }
+                    };
+                }
             };
         }
     }
