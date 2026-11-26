@@ -1,4 +1,5 @@
 use crate::{colour::Colour, state::UIState};
+use chrono::{DateTime, Utc};
 use eframe::egui::{Align2, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 
 pub struct Controls {
@@ -7,7 +8,7 @@ pub struct Controls {
     length: u32,
     progress: f32,
     scrub_progress: Option<f32>,
-    // since_sync: f32,
+    last_tick: DateTime<Utc>,
 }
 
 impl Controls {
@@ -18,7 +19,7 @@ impl Controls {
             length: 0,
             progress: 0.0,
             scrub_progress: None,
-            // since_sync: 0.0,
+            last_tick: Utc::now(),
         }
     }
 
@@ -32,7 +33,6 @@ impl Controls {
 
     pub fn set_progress(&mut self, progress: f32) {
         self.progress = progress;
-        // self.since_sync = 0.0;
     }
 }
 
@@ -61,17 +61,13 @@ impl Widget for &mut Controls {
             }
         }
 
+        let now = Utc::now();
+        let elapsed = now.signed_duration_since(self.last_tick);
+        self.last_tick = now;
+
         if self.scrub_progress.is_none() && self.length > 0 && self.playing {
-            let dt = ui.input(|i| i.stable_dt).min(0.1);
-            // self.since_sync += dt;
-
-            let step = dt * 1000.0 / self.length as f32;
+            let step = elapsed.as_seconds_f32() * 1000.0 / self.length as f32;
             self.progress = (self.progress + step).min(1.0);
-
-            // if self.since_sync >= 1.0 {
-            //     self.since_sync -= 1.0;
-            //     let _ = self.state.sync_progress(self.progress);
-            // }
         }
 
         let painter = ui.painter_at(rect);
