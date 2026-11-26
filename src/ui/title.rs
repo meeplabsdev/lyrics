@@ -42,7 +42,7 @@ impl Widget for &mut Title {
                 rect.center().y - text_size.y * 0.5,
             )
         } else {
-            let speed = 30.0;
+            let speed = 10.0;
             let period = overflow / speed;
 
             let t = ui.ctx().input(|i| i.time) as f32;
