@@ -27,7 +27,6 @@ struct DealerMessage {
     headers: HashMap<String, Value>,
     #[serde(default)]
     payloads: Vec<String>,
-    method: String,
     r#type: String,
     #[serde(default)]
     uri: String,
