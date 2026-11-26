@@ -91,8 +91,6 @@ impl LyricsApp {
             } => {
                 self.artist.set_artist(artist, year);
                 self.controls.set_length(length);
-                self.controls.set_progress(0.0);
-                self.lyrics.set_progress(0.0);
                 self.title.set_title(title);
             }
             UIEvent::ProgressSync { progress } => {
