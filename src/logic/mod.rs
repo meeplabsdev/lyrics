@@ -20,7 +20,7 @@ use crate::{
 use anyhow::{Result, anyhow};
 use futures_util::{FutureExt, select};
 use reqwest::Client;
-use std::{fs, time::Duration};
+use std::{fs, sync::Arc, time::Duration};
 use tokio::{
     runtime::Handle,
     task::JoinHandle,
@@ -29,17 +29,11 @@ use tokio::{
 
 pub struct Logic {
     ui_state: UIState,
-    spotify_state: SpotifyState,
 }
 
 impl Logic {
     pub fn new(ui_state: UIState) -> Self {
-        let spotify_state = SpotifyState::new();
-
-        Self {
-            ui_state,
-            spotify_state,
-        }
+        Self { ui_state }
     }
 
     pub fn spawn(self, runtime: &Handle) -> JoinHandle<Result<()>> {
@@ -87,7 +81,11 @@ impl Logic {
 
         fs::write("spotify.token", access_token.store()?)?;
         paris::log!("Signed in with {access_token:?}");
-        let mut spotify = Spotify::new(self.spotify_state.clone(), client, access_token).await?;
+        let (spotify, initial) = Spotify::new(client, access_token).await?;
+        let spotify = Arc::new(spotify);
+        let mut spotify_state = SpotifyState::new(spotify.clone());
+        spotify_state.set_cluster(initial).await?;
+
         let mut ping_interval = interval(Duration::from_secs(30));
         ping_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         self.ui_state.set_app_state(AppState::Ready)?;
@@ -101,7 +99,7 @@ impl Logic {
                         _ => {}
                     };
                 }
-                event = self.spotify_state.wait_event().fuse() => {
+                event = spotify_state.wait_event().fuse() => {
                     match event? {
                         SpotifyEvent::ClusterUpdate { image_url, title, artist, year, length, progress, playing } => {
                             self.ui_state.sync_progress(progress)?;
@@ -117,7 +115,7 @@ impl Logic {
                     };
                 }
                 msg = spotify._next_msg().fuse() => {
-                    spotify.process(&msg?).await?;
+                    spotify.process(&msg?, &mut spotify_state).await?;
                 }
                 _ = ping_interval.tick().fuse() => {
                     spotify.ping().await?;

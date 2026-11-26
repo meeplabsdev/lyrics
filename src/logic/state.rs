@@ -1,5 +1,8 @@
+use crate::logic::spotify::Spotify;
 use anyhow::{Context, Result};
+use chrono::{DateTime, Datelike};
 use librespot_protocol::connect::{Cluster, ClusterUpdate};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 
 #[derive(Debug, Clone)]
@@ -16,17 +19,19 @@ pub enum SpotifyEvent {
 }
 
 pub struct SpotifyState {
-    cluster: Option<Cluster>,
+    // cluster: Option<Cluster>,
+    spotify: Arc<Spotify>,
     tx: broadcast::Sender<SpotifyEvent>,
     rx: broadcast::Receiver<SpotifyEvent>,
 }
 
 impl SpotifyState {
-    pub fn new() -> Self {
+    pub fn new(spotify: Arc<Spotify>) -> Self {
         let (tx, rx) = broadcast::channel(16);
 
         Self {
-            cluster: None,
+            // cluster: None,
+            spotify,
             tx,
             rx,
         }
@@ -40,7 +45,7 @@ impl SpotifyState {
         Ok(self.rx.recv().await?)
     }
 
-    pub async fn set_cluster(&mut self, cluster: Cluster) -> Result<()> {
+    pub async fn set_cluster(&self, cluster: Cluster) -> Result<()> {
         let player_state = cluster.clone().player_state;
         let metadata = &player_state.track.metadata;
 
@@ -49,13 +54,31 @@ impl SpotifyState {
             .and_then(|iu| iu.strip_prefix("spotify:image:"))
             .unwrap_or_default();
 
-        let title = metadata.get("title").cloned().unwrap_or_default();
-        let artist = metadata
-            .get("artist_uri")
-            .and_then(|iu| iu.strip_prefix("spotify:artist:"))
+        let track_id = player_state
+            .track
+            .uri
+            .strip_prefix("spotify:track:")
             .unwrap_or_default();
 
+        let track = self.spotify.fetch_track(track_id.to_string()).await?;
+
+        // let title = metadata.get("title").cloned().unwrap_or_default();
+        let title = track.original_title.clone().unwrap_or_default();
+
+        let artist = track
+            .artist
+            .iter()
+            .filter_map(|a| a.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let year = DateTime::from_timestamp_secs(track.earliest_live_timestamp())
+            .map(|d| d.year())
+            .unwrap_or(0)
+            .max(0) as u32;
+
         let length = player_state.duration.max(0) as u32;
+
         let progress = (cluster.server_timestamp_ms - player_state.timestamp
             + player_state.position_as_of_timestamp) as u32;
 
@@ -64,20 +87,20 @@ impl SpotifyState {
         self.tx.send(SpotifyEvent::ClusterUpdate {
             image_url: format!("https://i.scdn.co/image/{image_id}"),
             title,
-            artist: artist.to_string(),
-            year: 0,
+            artist,
+            year,
             length,
             progress,
             playing,
         })?;
 
         // paris::log!("Got cluster {:#?}", cluster);
-        self.cluster = Some(cluster);
+        // self.cluster = Some(cluster);
 
         Ok(())
     }
 
-    pub async fn update_cluster(&mut self, mut update: ClusterUpdate) -> Result<()> {
+    pub async fn update_cluster(&self, mut update: ClusterUpdate) -> Result<()> {
         // TODO: a better way
         self.set_cluster(update.cluster.take().context("update had no cluster")?)
             .await?;
@@ -89,7 +112,8 @@ impl SpotifyState {
 impl Clone for SpotifyState {
     fn clone(&self) -> Self {
         Self {
-            cluster: self.cluster.clone(),
+            // cluster: self.cluster.clone(),
+            spotify: self.spotify.clone(),
             tx: self.tx.clone(),
             rx: self.tx.subscribe(),
         }

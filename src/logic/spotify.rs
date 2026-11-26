@@ -1,11 +1,20 @@
-use crate::logic::{
-    access_token::AccessToken, apresolve::APResolve, device_id::DeviceId, state::SpotifyState,
+use crate::{
+    logic::{
+        access_token::AccessToken, apresolve::APResolve, device_id::DeviceId, state::SpotifyState,
+    },
+    utils::spotify_id_to_gid,
 };
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine, prelude::BASE64_STANDARD};
-use futures_util::{SinkExt, StreamExt};
-use librespot_protocol::connect::{
-    Capabilities, Cluster, ClusterUpdate, Device, DeviceInfo, MemberType, PutStateRequest,
+use futures_util::{
+    SinkExt, StreamExt,
+    stream::{SplitSink, SplitStream},
+};
+use librespot_protocol::{
+    connect::{
+        Capabilities, Cluster, ClusterUpdate, Device, DeviceInfo, MemberType, PutStateRequest,
+    },
+    metadata::Track,
 };
 use protobuf::{Message, MessageField};
 use reqwest::{
@@ -14,10 +23,10 @@ use reqwest::{
 };
 use serde_json::Value;
 use std::collections::HashMap;
-use tokio::net::TcpStream;
+use tokio::{net::TcpStream, sync::Mutex};
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async,
-    tungstenite::{self, client::IntoClientRequest},
+    tungstenite::{Message as TMessage, client::IntoClientRequest},
 };
 
 #[allow(dead_code)]
@@ -33,34 +42,34 @@ struct DealerMessage {
 }
 
 pub struct Spotify {
-    state: SpotifyState,
     client: Client,
     token: AccessToken,
     apresolve: APResolve,
     device_id: DeviceId,
     connection: Option<String>,
-    pub dealer: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    stream: Option<Mutex<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>>,
+    sink: Option<Mutex<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, TMessage>>>,
 }
 
 impl Spotify {
-    pub async fn new(state: SpotifyState, client: Client, token: AccessToken) -> Result<Self> {
+    pub async fn new(client: Client, token: AccessToken) -> Result<(Self, Cluster)> {
         let apresolve = APResolve::fetch(&client).await?;
         let device_id = DeviceId::new().await?;
 
         let mut this = Self {
-            state,
             client,
             token,
             apresolve,
             device_id,
             connection: None,
-            dealer: None,
+            stream: None,
+            sink: None,
         };
 
         this.init_dealer_socket().await?;
-        this.init_device().await?;
+        let initial = this.init_device().await?;
 
-        Ok(this)
+        Ok((this, initial))
     }
 
     pub async fn next_track(&self) -> Result<()> {
@@ -75,21 +84,49 @@ impl Spotify {
         Ok(())
     }
 
-    pub async fn _next_msg(&mut self) -> Result<String> {
-        let Some(ref mut stream) = self.dealer else {
+    pub async fn fetch_track(&self, id: String) -> Result<Track> {
+        let Some(ref connection_id) = self.connection else {
+            return Err(anyhow!("create_device before connection established"));
+        };
+
+        // TODO: cache
+        let res = self
+            .client
+            .get(format!(
+                "https://spclient.wg.spotify.com/metadata/4/track/{}",
+                spotify_id_to_gid(&id)?
+            ))
+            .header(
+                AUTHORIZATION,
+                format!("{} {}", self.token.token_type, self.token.access_token),
+            )
+            .header("X-Spotify-Connection-Id", connection_id)
+            .header(CONTENT_TYPE, "application/protobuf")
+            .send()
+            .await?
+            .error_for_status()?;
+
+        Ok(Track::parse_from_bytes(&res.bytes().await?)?)
+    }
+
+    pub async fn _next_msg(&self) -> Result<String> {
+        let Some(ref stream) = self.stream else {
             return Err(anyhow!("no available stream"));
         };
 
         Ok(stream
-            .select_next_some()
-            .await?
+            .lock()
+            .await
+            .next()
+            .await
+            .context("no message on stream")??
             .into_text()?
             .as_str()
             .to_string())
     }
 
     /// processes websocket messages
-    pub async fn process(&mut self, msg: &str) -> Result<()> {
+    pub async fn process(&self, msg: &str, state: &mut SpotifyState) -> Result<()> {
         let msg = serde_json::from_str::<DealerMessage>(msg)?;
 
         match msg {
@@ -98,7 +135,7 @@ impl Spotify {
                 for payload in payloads {
                     let bytes = BASE64_STANDARD.decode(payload)?;
                     let update = ClusterUpdate::parse_from_bytes(&bytes)?;
-                    self.state.update_cluster(update).await?;
+                    state.update_cluster(update).await?;
                 }
             }
             _ => {}
@@ -108,14 +145,15 @@ impl Spotify {
     }
 
     /// call every 30 seconds to maintain connection
-    pub async fn ping(&mut self) -> Result<()> {
-        let Some(ref mut stream) = self.dealer else {
+    pub async fn ping(&self) -> Result<()> {
+        let Some(ref sink) = self.sink else {
             return Err(anyhow!("no available stream"));
         };
 
         // paris::info!("ping!");
-        stream
-            .send(tungstenite::Message::Text("{\"type\":\"ping\"}".into()))
+        sink.lock()
+            .await
+            .send(TMessage::Text("{\"type\":\"ping\"}".into()))
             .await?;
 
         Ok(())
@@ -132,9 +170,15 @@ impl Spotify {
             .append_pair("access_token", &self.token.access_token.clone());
 
         let req = url.as_str().into_client_request()?;
-        let (mut stream, _) = connect_async(req).await?;
+        let (stream, _) = connect_async(req).await?;
+        let (sink, mut stream) = stream.split();
         let msg = serde_json::from_str::<DealerMessage>(
-            stream.select_next_some().await?.into_text()?.as_str(),
+            stream
+                .next()
+                .await
+                .context("no message on stream")??
+                .into_text()?
+                .as_str(),
         )?;
 
         self.connection = Some(
@@ -147,12 +191,13 @@ impl Spotify {
         );
 
         paris::log!("Connected with id {:?}", self.connection);
-        self.dealer = Some(stream);
+        self.stream = Some(Mutex::new(stream));
+        self.sink = Some(Mutex::new(sink));
 
         Ok(())
     }
 
-    async fn init_device(&mut self) -> Result<()> {
+    async fn init_device(&mut self) -> Result<Cluster> {
         let Some(ref connection_id) = self.connection else {
             return Err(anyhow!("create_device before connection established"));
         };
@@ -193,9 +238,6 @@ impl Spotify {
             .await?
             .error_for_status()?;
 
-        let cluster = Cluster::parse_from_bytes(&res.bytes().await?)?;
-        self.state.set_cluster(cluster).await?;
-
-        Ok(())
+        Ok(Cluster::parse_from_bytes(&res.bytes().await?)?)
     }
 }
