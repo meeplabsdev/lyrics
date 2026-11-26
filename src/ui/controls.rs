@@ -1,15 +1,15 @@
-use crate::{colour::Colour, state::State};
+use crate::{colour::Colour, state::UIState};
 use eframe::egui::{Align2, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 
 pub struct Controls {
-    state: State,
+    state: UIState,
     length: u32,
     progress: f32,
     scrub_progress: Option<f32>,
 }
 
 impl Controls {
-    pub fn new(state: State) -> Self {
+    pub fn new(state: UIState) -> Self {
         Self {
             state,
             length: 0,

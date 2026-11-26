@@ -1,4 +1,4 @@
-use crate::{colour::Colour, state::State};
+use crate::{colour::Colour, state::UIState};
 use eframe::egui::{Image, Pos2, Rect, Sense, Stroke, StrokeKind, Vec2, Widget, include_image};
 
 #[derive(Debug, Clone, Copy)]
@@ -9,14 +9,14 @@ pub enum RepeatMode {
 }
 
 pub struct ArtworkControls {
-    state: State,
+    state: UIState,
     playing: bool,
     shuffle: bool,
     repeat: RepeatMode,
 }
 
 impl ArtworkControls {
-    pub fn new(state: State) -> Self {
+    pub fn new(state: UIState) -> Self {
         Self {
             state,
             playing: false,

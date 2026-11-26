@@ -14,7 +14,7 @@ pub enum AppState {
 }
 
 #[derive(Debug, Clone)]
-pub enum Event {
+pub enum UIEvent {
     AppStateChanged {
         app_state: AppState,
     },
@@ -68,29 +68,29 @@ pub enum Event {
     PreviousTrack,
 }
 
-pub struct State {
-    tx: broadcast::Sender<Event>,
-    rx: broadcast::Receiver<Event>,
+pub struct UIState {
+    tx: broadcast::Sender<UIEvent>,
+    rx: broadcast::Receiver<UIEvent>,
 }
 
-impl State {
+impl UIState {
     pub fn new() -> Self {
         let (tx, rx) = broadcast::channel(16);
 
         Self { tx, rx }
     }
 
-    pub fn event(&mut self) -> Result<Event> {
+    pub fn event(&mut self) -> Result<UIEvent> {
         Ok(self.rx.try_recv()?)
     }
 
-    pub async fn wait_event(&mut self) -> Result<Event> {
+    pub async fn wait_event(&mut self) -> Result<UIEvent> {
         Ok(self.rx.recv().await?)
     }
 
     pub fn set_app_state(&mut self, app_state: AppState) -> Result<()> {
         paris::log!("Set app state to {app_state:?}");
-        self.tx.send(Event::AppStateChanged { app_state })?;
+        self.tx.send(UIEvent::AppStateChanged { app_state })?;
 
         Ok(())
     }
@@ -117,8 +117,8 @@ impl State {
         let qr = ColorImage::from_rgba_unmultiplied(size, &pixels);
 
         paris::log!("Set login code to {code}");
-        self.tx.send(Event::LoginChanged { qr, code })?;
-        self.tx.send(Event::ArtworkChanged {
+        self.tx.send(UIEvent::LoginChanged { qr, code })?;
+        self.tx.send(UIEvent::ArtworkChanged {
             name: "QrCode".into(),
             image: ColorImage::from_rgba_unmultiplied([1, 1], &Colour::WEAK.into_array_u8()),
             colours: vec![Colour::WHITE, Colour::BLACK],
@@ -138,7 +138,7 @@ impl State {
         let artist = artist.into();
 
         paris::log!("Set track to {title}");
-        self.tx.send(Event::TrackChanged {
+        self.tx.send(UIEvent::TrackChanged {
             title,
             artist,
             year,
@@ -150,15 +150,15 @@ impl State {
 
     pub fn set_progress(&mut self, progress: f32) -> Result<()> {
         paris::log!("Set progress to {progress}");
-        self.tx.send(Event::ProgressChanged { progress })?;
-        self.tx.send(Event::ProgressSync { progress })?;
+        self.tx.send(UIEvent::ProgressChanged { progress })?;
+        self.tx.send(UIEvent::ProgressSync { progress })?;
 
         Ok(())
     }
 
     pub fn sync_progress(&mut self, progress: f32) -> Result<()> {
         paris::log!("Synced progress to {progress}");
-        self.tx.send(Event::ProgressSync { progress })?;
+        self.tx.send(UIEvent::ProgressSync { progress })?;
 
         Ok(())
     }
@@ -191,7 +191,7 @@ impl State {
         .collect();
 
         paris::log!("Set artwork to {uri}");
-        self.tx.send(Event::ArtworkChanged {
+        self.tx.send(UIEvent::ArtworkChanged {
             name: uri,
             image,
             colours,
@@ -202,72 +202,72 @@ impl State {
 
     pub fn set_lyrics(&mut self, lyrics: Vec<String>) -> Result<()> {
         paris::log!("Set lyrics ({} lines)", lyrics.len());
-        self.tx.send(Event::LyricsChanged { lyrics })?;
+        self.tx.send(UIEvent::LyricsChanged { lyrics })?;
 
         Ok(())
     }
 
     pub fn set_playing(&mut self, playing: bool) -> Result<()> {
         paris::log!("Set playing to {playing}");
-        self.tx.send(Event::PlayingChanged { playing })?;
-        self.tx.send(Event::PlayingSync { playing })?;
+        self.tx.send(UIEvent::PlayingChanged { playing })?;
+        self.tx.send(UIEvent::PlayingSync { playing })?;
 
         Ok(())
     }
 
     pub fn sync_playing(&mut self, playing: bool) -> Result<()> {
         paris::log!("Synced playing to {playing}");
-        self.tx.send(Event::PlayingSync { playing })?;
+        self.tx.send(UIEvent::PlayingSync { playing })?;
 
         Ok(())
     }
 
     pub fn set_shuffle(&mut self, shuffle: bool) -> Result<()> {
         paris::log!("Set shuffle to {shuffle}");
-        self.tx.send(Event::ShuffleChanged { shuffle })?;
-        self.tx.send(Event::ShuffleSync { shuffle })?;
+        self.tx.send(UIEvent::ShuffleChanged { shuffle })?;
+        self.tx.send(UIEvent::ShuffleSync { shuffle })?;
 
         Ok(())
     }
 
     pub fn sync_shuffle(&mut self, shuffle: bool) -> Result<()> {
         paris::log!("Synced shuffle to {shuffle}");
-        self.tx.send(Event::ShuffleSync { shuffle })?;
+        self.tx.send(UIEvent::ShuffleSync { shuffle })?;
 
         Ok(())
     }
 
     pub fn set_repeat(&mut self, repeat: RepeatMode) -> Result<()> {
         paris::log!("Set repeat to {repeat:?}");
-        self.tx.send(Event::RepeatChanged { repeat })?;
-        self.tx.send(Event::RepeatSync { repeat })?;
+        self.tx.send(UIEvent::RepeatChanged { repeat })?;
+        self.tx.send(UIEvent::RepeatSync { repeat })?;
 
         Ok(())
     }
 
     pub fn sync_repeat(&mut self, repeat: RepeatMode) -> Result<()> {
         paris::log!("Synced repeat to {repeat:?}");
-        self.tx.send(Event::RepeatSync { repeat })?;
+        self.tx.send(UIEvent::RepeatSync { repeat })?;
 
         Ok(())
     }
 
     pub fn next_track(&mut self) -> Result<()> {
         paris::log!("Triggered next track");
-        self.tx.send(Event::NextTrack)?;
+        self.tx.send(UIEvent::NextTrack)?;
 
         Ok(())
     }
 
     pub fn prev_track(&mut self) -> Result<()> {
         paris::log!("Triggered previous track");
-        self.tx.send(Event::PreviousTrack)?;
+        self.tx.send(UIEvent::PreviousTrack)?;
 
         Ok(())
     }
 }
 
-impl Clone for State {
+impl Clone for UIState {
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),

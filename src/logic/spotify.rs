@@ -1,4 +1,6 @@
-use crate::logic::{access_token::AccessToken, apresolve::APResolve};
+use crate::logic::{
+    access_token::AccessToken, apresolve::APResolve, device_id::DeviceId, state::SpotifyState,
+};
 use anyhow::{Context, Result, anyhow};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use futures_util::{SinkExt, StreamExt};
@@ -11,9 +13,8 @@ use reqwest::{
     header::{AUTHORIZATION, CONTENT_TYPE},
 };
 use serde_json::Value;
-use sha1::{Digest, Sha1};
-use std::{collections::HashMap, fs, time::Duration};
-use tokio::{net::TcpStream, sync::Mutex};
+use std::collections::HashMap;
+use tokio::net::TcpStream;
 use tokio_tungstenite::{
     MaybeTlsStream, WebSocketStream, connect_async,
     tungstenite::{self, client::IntoClientRequest},
@@ -27,113 +28,39 @@ struct DealerMessage {
     payloads: Vec<String>,
     // method: String,
     r#type: String,
+    #[serde(default)]
     uri: String,
 }
 
-pub enum Event {
-    Update { image_url: String, title: String },
-}
-
 pub struct Spotify {
+    state: SpotifyState,
     client: Client,
     token: AccessToken,
     apresolve: APResolve,
-    device: [u8; 20],
+    device_id: DeviceId,
     connection: Option<String>,
-    dealer: Option<Mutex<WebSocketStream<MaybeTlsStream<TcpStream>>>>,
-    cluster: Option<Cluster>,
+    pub dealer: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
 }
 
 impl Spotify {
-    pub async fn new(client: Client, token: AccessToken) -> Result<Self> {
+    pub async fn new(state: SpotifyState, client: Client, token: AccessToken) -> Result<Self> {
         let apresolve = APResolve::fetch(&client).await?;
-        let device = match (async || {
-            if !fs::exists("spotify.device")? {
-                return Err(anyhow!("spotify.device does not exist"));
-            }
-
-            let i = &fs::read("spotify.device")?;
-            if i.len() != 20 {
-                return Err(anyhow!("spotify.device was not 20 bytes"));
-            }
-
-            Ok(*i.as_array().context("failed to parse spotify.device")?)
-        })()
-        .await
-        {
-            Ok(i) => i,
-            Err(_) => {
-                let i = *Sha1::digest(rand::random::<u128>().to_be_bytes())
-                    .as_array()
-                    .context("failed to generate device id")?;
-
-                fs::write("spotify.device", &i)?;
-
-                i
-            }
-        };
+        let device_id = DeviceId::new().await?;
 
         let mut this = Self {
+            state,
             client,
             token,
             apresolve,
-            device,
+            device_id,
             connection: None,
             dealer: None,
-            cluster: None,
         };
 
-        this.create_dealer_socket().await?;
-        this.create_device().await?;
+        this.init_dealer_socket().await?;
+        this.init_device().await?;
 
         Ok(this)
-    }
-
-    pub async fn wait_event(&self) -> Result<Event> {
-        let Some(ref stream) = self.dealer else {
-            return Err(anyhow!("no available stream"));
-        };
-
-        loop {
-            let msg = serde_json::from_str::<DealerMessage>(
-                stream
-                    .lock()
-                    .await
-                    .select_next_some()
-                    .await?
-                    .into_text()?
-                    .as_str(),
-            )?;
-
-            if msg.r#type == "pong" {
-                continue;
-            }
-
-            if msg.uri != "hm://connect-state/v1/cluster" {
-                continue;
-            }
-
-            for payload in msg.payloads {
-                let bytes = BASE64_STANDARD.decode(payload)?;
-                let update = ClusterUpdate::parse_from_bytes(&bytes)?;
-                let metadata = update.cluster.player_state.track.metadata.clone();
-
-                return Ok(Event::Update {
-                    image_url: format!(
-                        "https://i.scdn.co/image/{}",
-                        metadata
-                            .get("image_url")
-                            .context("cluster had no image url")?
-                            .strip_prefix("spotify:image:")
-                            .context("image url did not start with spotify:image:")?
-                    ),
-                    title: metadata
-                        .get("title")
-                        .context("cluster had no title")?
-                        .to_string(),
-                });
-            }
-        }
     }
 
     pub async fn next_track(&self) -> Result<()> {
@@ -148,22 +75,53 @@ impl Spotify {
         Ok(())
     }
 
-    pub async fn ping_loop(&self) -> Result<()> {
-        loop {
-            tokio::time::sleep(Duration::from_secs(30)).await;
-            let Some(ref stream) = self.dealer else {
-                continue;
-            };
+    pub async fn _next_msg(&mut self) -> Result<String> {
+        let Some(ref mut stream) = self.dealer else {
+            return Err(anyhow!("no available stream"));
+        };
 
-            stream
-                .lock()
-                .await
-                .send(tungstenite::Message::Text("{\"type\":\"ping\"}".into()))
-                .await?;
-        }
+        Ok(stream
+            .select_next_some()
+            .await?
+            .into_text()?
+            .as_str()
+            .to_string())
     }
 
-    async fn create_dealer_socket(&mut self) -> Result<()> {
+    /// processes websocket messages
+    pub async fn process(&mut self, msg: &str) -> Result<()> {
+        let msg = serde_json::from_str::<DealerMessage>(msg)?;
+
+        match msg {
+            // DealerMessage { r#type, .. } if r#type == "pong" => paris::info!("pong"),
+            DealerMessage { payloads, uri, .. } if uri == "hm://connect-state/v1/cluster" => {
+                for payload in payloads {
+                    let bytes = BASE64_STANDARD.decode(payload)?;
+                    let update = ClusterUpdate::parse_from_bytes(&bytes)?;
+                    self.state.update_cluster(update).await?;
+                }
+            }
+            _ => {}
+        };
+
+        Ok(())
+    }
+
+    /// call every 30 seconds to maintain connection
+    pub async fn ping(&mut self) -> Result<()> {
+        let Some(ref mut stream) = self.dealer else {
+            return Err(anyhow!("no available stream"));
+        };
+
+        // paris::info!("ping!");
+        stream
+            .send(tungstenite::Message::Text("{\"type\":\"ping\"}".into()))
+            .await?;
+
+        Ok(())
+    }
+
+    async fn init_dealer_socket(&mut self) -> Result<()> {
         let mut url = self
             .apresolve
             .dealerg2()
@@ -189,12 +147,12 @@ impl Spotify {
         );
 
         paris::log!("Connected with id {:?}", self.connection);
-        self.dealer = Some(Mutex::new(stream));
+        self.dealer = Some(stream);
 
         Ok(())
     }
 
-    async fn create_device(&mut self) -> Result<()> {
+    async fn init_device(&mut self) -> Result<()> {
         let Some(ref connection_id) = self.connection else {
             return Err(anyhow!("create_device before connection established"));
         };
@@ -222,7 +180,7 @@ impl Spotify {
                     .spclient()
                     .context("no available spclient")?
                     .as_str(),
-                hex::encode(self.device)
+                self.device_id
             ))
             .header(
                 AUTHORIZATION,
@@ -236,9 +194,7 @@ impl Spotify {
             .error_for_status()?;
 
         let cluster = Cluster::parse_from_bytes(&res.bytes().await?)?;
-        // TODO: switch to event broadcast::channel and push to that instead of using cluster property
-        self.cluster = Some(cluster);
-        paris::log!("Got cluster {:#?}", self.cluster);
+        self.state.set_cluster(cluster).await?;
 
         Ok(())
     }

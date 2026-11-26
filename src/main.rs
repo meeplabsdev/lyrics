@@ -11,7 +11,7 @@ use crate::{
     colour::Colour,
     layout::Layout,
     logic::Logic,
-    state::{AppState, Event, State},
+    state::{AppState, UIEvent, UIState},
     ui::{
         artist::Artist, artwork::Artwork, artwork_controls::ArtworkControls, controls::Controls,
         dynamic_bg::DynamicBg, lyrics::Lyrics, qr_instructions::QrInstructions, qrcode::QrCode,
@@ -40,14 +40,14 @@ struct LyricsApp {
     lyrics: Lyrics,
 
     app_state: AppState,
-    state: State,
+    state: UIState,
     logic: JoinHandle<Result<()>>,
 }
 
 impl LyricsApp {
     fn new<'a>(
         cc: &'a eframe::CreationContext<'a>,
-        state: State,
+        state: UIState,
         logic: JoinHandle<Result<()>>,
     ) -> Result<Self> {
         let mut this = Self {
@@ -74,16 +74,16 @@ impl LyricsApp {
         Ok(this)
     }
 
-    fn handle_event(&mut self, event: Event, ui: &mut egui::Ui) {
+    fn handle_event(&mut self, event: UIEvent, ui: &mut egui::Ui) {
         match event {
-            Event::AppStateChanged { app_state } => {
+            UIEvent::AppStateChanged { app_state } => {
                 self.app_state = app_state;
             }
-            Event::LoginChanged { qr, code } => {
+            UIEvent::LoginChanged { qr, code } => {
                 self.qrcode.set_image(qr);
                 self.qr_instructions.set_code(code);
             }
-            Event::TrackChanged {
+            UIEvent::TrackChanged {
                 title,
                 artist,
                 year,
@@ -95,11 +95,11 @@ impl LyricsApp {
                 self.lyrics.set_progress(0.0);
                 self.title.set_title(title);
             }
-            Event::ProgressSync { progress } => {
+            UIEvent::ProgressSync { progress } => {
                 self.controls.set_progress(progress);
                 self.lyrics.set_progress(progress);
             }
-            Event::ArtworkChanged {
+            UIEvent::ArtworkChanged {
                 name,
                 image,
                 colours,
@@ -107,16 +107,16 @@ impl LyricsApp {
                 self.artwork.set_image(name, image);
                 self.bg.set_colours(colours);
             }
-            Event::LyricsChanged { lyrics } => {
+            UIEvent::LyricsChanged { lyrics } => {
                 self.lyrics.set_lyrics(lyrics);
             }
-            Event::PlayingSync { playing } => {
+            UIEvent::PlayingSync { playing } => {
                 self.artwork_controls.set_playing(playing);
             }
-            Event::ShuffleSync { shuffle } => {
+            UIEvent::ShuffleSync { shuffle } => {
                 self.artwork_controls.set_shuffle(shuffle);
             }
-            Event::RepeatSync { repeat } => {
+            UIEvent::RepeatSync { repeat } => {
                 self.artwork_controls.set_repeat(repeat);
             }
             _ => {}
@@ -180,7 +180,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
 
-    let state = State::new();
+    let state = UIState::new();
     let runtime = Runtime::new().unwrap();
     let logic = Logic::new(state.clone());
 

@@ -1,7 +1,9 @@
 mod access_token;
 mod apresolve;
+mod device_id;
 mod device_login;
 mod spotify;
+mod state;
 
 // spotify desktop client id
 pub const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
@@ -10,23 +12,34 @@ use crate::{
     logic::{
         access_token::AccessToken,
         device_login::DeviceLogin,
-        spotify::{Event as SEvent, Spotify},
+        spotify::Spotify,
+        state::{SpotifyEvent, SpotifyState},
     },
-    state::{AppState, Event, State},
+    state::{AppState, UIEvent, UIState},
 };
 use anyhow::{Result, anyhow};
 use futures_util::{FutureExt, select};
 use reqwest::Client;
-use std::{fs, sync::Arc};
-use tokio::{runtime::Handle, task::JoinHandle};
+use std::{fs, time::Duration};
+use tokio::{
+    runtime::Handle,
+    task::JoinHandle,
+    time::{MissedTickBehavior, interval},
+};
 
 pub struct Logic {
-    state: State,
+    ui_state: UIState,
+    spotify_state: SpotifyState,
 }
 
 impl Logic {
-    pub fn new(state: State) -> Self {
-        Self { state }
+    pub fn new(ui_state: UIState) -> Self {
+        let spotify_state = SpotifyState::new();
+
+        Self {
+            ui_state,
+            spotify_state,
+        }
     }
 
     pub fn spawn(self, runtime: &Handle) -> JoinHandle<Result<()>> {
@@ -42,7 +55,7 @@ impl Logic {
     }
 
     async fn main(mut self) -> Result<()> {
-        self.state.set_app_state(AppState::Loading)?;
+        self.ui_state.set_app_state(AppState::Loading)?;
 
         let client = Client::new();
         let access_token = match (async || {
@@ -65,43 +78,46 @@ impl Logic {
             Ok(t) => t,
             Err(_) => {
                 let mut device_login = DeviceLogin::new();
-                self.state.set_login(device_login.device_code().await?)?;
-                self.state.set_app_state(AppState::Login)?;
+                self.ui_state.set_login(device_login.device_code().await?)?;
+                self.ui_state.set_app_state(AppState::Login)?;
+
                 device_login.wait_token().await?
             }
         };
 
         fs::write("spotify.token", access_token.store()?)?;
         paris::log!("Signed in with {access_token:?}");
-        let spotify = Arc::new(Spotify::new(client, access_token).await?);
-        let spotify_ping_loop = spotify.clone();
-        tokio::spawn(async move { spotify_ping_loop.ping_loop().await });
-
-        self.state.set_app_state(AppState::Ready)?;
-
-        self.state.set_progress(0.4)?;
-        self.state.set_playing(true)?;
+        let mut spotify = Spotify::new(self.spotify_state.clone(), client, access_token).await?;
+        let mut ping_interval = interval(Duration::from_secs(30));
+        ping_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        self.ui_state.set_app_state(AppState::Ready)?;
 
         loop {
             select! {
-                event = self.state.wait_event().fuse() => {
+                event = self.ui_state.wait_event().fuse() => {
                     match event? {
-                        Event::NextTrack => spotify.next_track().await?,
-                        Event::PreviousTrack => spotify.prev_track().await?,
+                        UIEvent::NextTrack => spotify.next_track().await?,
+                        UIEvent::PreviousTrack => spotify.prev_track().await?,
                         _ => {}
                     };
                 }
-                event = spotify.wait_event().fuse() => {
+                event = self.spotify_state.wait_event().fuse() => {
                     match event? {
-                        SEvent::Update { image_url, title } => {
-                            self.state
+                        SpotifyEvent::Update { image_url, title } => {
+                            self.ui_state
                                 .set_artwork(image_url)
                                 .await?;
 
-                            self.state
+                            self.ui_state
                                 .set_track(title, "", 0, 0)?;
                         }
                     };
+                }
+                msg = spotify._next_msg().fuse() => {
+                    spotify.process(&msg?).await?;
+                }
+                _ = ping_interval.tick().fuse() => {
+                    spotify.ping().await?;
                 }
             };
         }
