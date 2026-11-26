@@ -4,10 +4,7 @@ use color_thief::ColorFormat;
 use eframe::egui::ColorImage;
 use image::Rgba;
 use qrcode::{EcLevel, bits, canvas::Canvas, ec, render::Renderer};
-use tokio::sync::broadcast::{
-    self,
-    error::{RecvError, SendError, TryRecvError},
-};
+use tokio::sync::broadcast;
 
 #[derive(Debug, Clone)]
 pub enum AppState {
@@ -83,15 +80,15 @@ impl State {
         Self { tx, rx }
     }
 
-    pub fn event(&mut self) -> Result<Event, TryRecvError> {
-        self.rx.try_recv()
+    pub fn event(&mut self) -> Result<Event> {
+        Ok(self.rx.try_recv()?)
     }
 
-    pub async fn wait_event(&mut self) -> Result<Event, RecvError> {
-        self.rx.recv().await
+    pub async fn wait_event(&mut self) -> Result<Event> {
+        Ok(self.rx.recv().await?)
     }
 
-    pub fn set_app_state(&mut self, app_state: AppState) -> Result<(), SendError<Event>> {
+    pub fn set_app_state(&mut self, app_state: AppState) -> Result<()> {
         paris::log!("Set app state to {app_state:?}");
         self.tx.send(Event::AppStateChanged { app_state })?;
 
@@ -136,7 +133,7 @@ impl State {
         artist: impl Into<String>,
         year: u32,
         length: u32,
-    ) -> Result<(), SendError<Event>> {
+    ) -> Result<()> {
         let title = title.into();
         let artist = artist.into();
 
@@ -151,7 +148,7 @@ impl State {
         Ok(())
     }
 
-    pub fn set_progress(&mut self, progress: f32) -> Result<(), SendError<Event>> {
+    pub fn set_progress(&mut self, progress: f32) -> Result<()> {
         paris::log!("Set progress to {progress}");
         self.tx.send(Event::ProgressChanged { progress })?;
         self.tx.send(Event::ProgressSync { progress })?;
@@ -159,7 +156,7 @@ impl State {
         Ok(())
     }
 
-    pub fn sync_progress(&mut self, progress: f32) -> Result<(), SendError<Event>> {
+    pub fn sync_progress(&mut self, progress: f32) -> Result<()> {
         paris::log!("Synced progress to {progress}");
         self.tx.send(Event::ProgressSync { progress })?;
 
@@ -203,14 +200,14 @@ impl State {
         Ok(())
     }
 
-    pub fn set_lyrics(&mut self, lyrics: Vec<String>) -> Result<(), SendError<Event>> {
+    pub fn set_lyrics(&mut self, lyrics: Vec<String>) -> Result<()> {
         paris::log!("Set lyrics ({} lines)", lyrics.len());
         self.tx.send(Event::LyricsChanged { lyrics })?;
 
         Ok(())
     }
 
-    pub fn set_playing(&mut self, playing: bool) -> Result<(), SendError<Event>> {
+    pub fn set_playing(&mut self, playing: bool) -> Result<()> {
         paris::log!("Set playing to {playing}");
         self.tx.send(Event::PlayingChanged { playing })?;
         self.tx.send(Event::PlayingSync { playing })?;
@@ -218,14 +215,14 @@ impl State {
         Ok(())
     }
 
-    pub fn sync_playing(&mut self, playing: bool) -> Result<(), SendError<Event>> {
+    pub fn sync_playing(&mut self, playing: bool) -> Result<()> {
         paris::log!("Synced playing to {playing}");
         self.tx.send(Event::PlayingSync { playing })?;
 
         Ok(())
     }
 
-    pub fn set_shuffle(&mut self, shuffle: bool) -> Result<(), SendError<Event>> {
+    pub fn set_shuffle(&mut self, shuffle: bool) -> Result<()> {
         paris::log!("Set shuffle to {shuffle}");
         self.tx.send(Event::ShuffleChanged { shuffle })?;
         self.tx.send(Event::ShuffleSync { shuffle })?;
@@ -233,14 +230,14 @@ impl State {
         Ok(())
     }
 
-    pub fn sync_shuffle(&mut self, shuffle: bool) -> Result<(), SendError<Event>> {
+    pub fn sync_shuffle(&mut self, shuffle: bool) -> Result<()> {
         paris::log!("Synced shuffle to {shuffle}");
         self.tx.send(Event::ShuffleSync { shuffle })?;
 
         Ok(())
     }
 
-    pub fn set_repeat(&mut self, repeat: RepeatMode) -> Result<(), SendError<Event>> {
+    pub fn set_repeat(&mut self, repeat: RepeatMode) -> Result<()> {
         paris::log!("Set repeat to {repeat:?}");
         self.tx.send(Event::RepeatChanged { repeat })?;
         self.tx.send(Event::RepeatSync { repeat })?;
@@ -248,21 +245,21 @@ impl State {
         Ok(())
     }
 
-    pub fn sync_repeat(&mut self, repeat: RepeatMode) -> Result<(), SendError<Event>> {
+    pub fn sync_repeat(&mut self, repeat: RepeatMode) -> Result<()> {
         paris::log!("Synced repeat to {repeat:?}");
         self.tx.send(Event::RepeatSync { repeat })?;
 
         Ok(())
     }
 
-    pub fn next_track(&mut self) -> Result<(), SendError<Event>> {
+    pub fn next_track(&mut self) -> Result<()> {
         paris::log!("Triggered next track");
         self.tx.send(Event::NextTrack)?;
 
         Ok(())
     }
 
-    pub fn prev_track(&mut self) -> Result<(), SendError<Event>> {
+    pub fn prev_track(&mut self) -> Result<()> {
         paris::log!("Triggered previous track");
         self.tx.send(Event::PreviousTrack)?;
 
