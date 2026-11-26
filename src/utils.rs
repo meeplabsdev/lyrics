@@ -23,7 +23,7 @@ pub enum ExpiringOption<T> {
     Some { inner: T, expires: Instant },
 }
 
-#[allow(unused)]
+#[allow(dead_code)]
 impl<T> ExpiringOption<T> {
     pub fn none() -> Self {
         Self::None

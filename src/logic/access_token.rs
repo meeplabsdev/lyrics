@@ -18,7 +18,6 @@ enum RefreshTokenResponse {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
-#[allow(unused)]
 pub struct AccessToken {
     pub refresh_token: String,
     pub access_token: String,

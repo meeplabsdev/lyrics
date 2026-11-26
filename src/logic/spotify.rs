@@ -20,13 +20,14 @@ use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest},
 };
 
+#[allow(dead_code)]
 #[derive(serde::Deserialize, Debug)]
 struct DealerMessage {
     #[serde(default)]
     headers: HashMap<String, Value>,
     #[serde(default)]
     payloads: Vec<String>,
-    // method: String,
+    method: String,
     r#type: String,
     #[serde(default)]
     uri: String,
