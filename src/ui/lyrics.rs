@@ -1,17 +1,16 @@
+use crate::{colour::Colour, playback::Playback};
 use eframe::egui::{FontFamily, FontId, Pos2, Sense, Widget};
-
-use crate::colour::Colour;
 
 pub struct Lyrics {
     lyrics: Vec<String>,
-    progress: f32,
+    playback: Playback,
 }
 
 impl Lyrics {
-    pub fn new() -> Self {
+    pub fn new(playback: Playback) -> Self {
         Self {
             lyrics: Vec::new(),
-            progress: 0.0,
+            playback,
         }
     }
 
@@ -19,14 +18,10 @@ impl Lyrics {
         self.lyrics = lyrics;
     }
 
-    pub fn set_progress(&mut self, progress: f32) {
-        self.progress = progress;
-    }
-
     // TODO: obviously use line timings, this is fine for now
     fn is_focussed(&self, idx: usize) -> bool {
-        self.progress >= idx as f32 / self.lyrics.len() as f32
-            && self.progress < (idx + 1) as f32 / self.lyrics.len() as f32
+        self.playback.progress_f32() >= idx as f32 / self.lyrics.len() as f32
+            && self.playback.progress_f32() < (idx + 1) as f32 / self.lyrics.len() as f32
     }
 
     fn center_idx(&self) -> usize {
@@ -35,7 +30,7 @@ impl Lyrics {
             return 0;
         }
 
-        let idx = (self.progress * len as f32) as usize;
+        let idx = (self.playback.progress_f32() * len as f32) as usize;
         idx.min(len - 1)
     }
 }

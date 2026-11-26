@@ -1,38 +1,19 @@
-use crate::{colour::Colour, state::UIState};
-use chrono::{DateTime, Utc};
+use crate::{colour::Colour, playback::Playback, state::UIState};
 use eframe::egui::{Align2, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 
 pub struct Controls {
     state: UIState,
-    playing: bool,
-    length: u32,
-    progress: f32,
-    scrub_progress: Option<f32>,
-    last_tick: DateTime<Utc>,
+    playback: Playback,
+    scrub_progress: Option<u32>,
 }
 
 impl Controls {
-    pub fn new(state: UIState) -> Self {
+    pub fn new(state: UIState, playback: Playback) -> Self {
         Self {
             state,
-            playing: false,
-            length: 0,
-            progress: 0.0,
+            playback,
             scrub_progress: None,
-            last_tick: Utc::now(),
         }
-    }
-
-    pub fn set_playing(&mut self, playing: bool) {
-        self.playing = playing;
-    }
-
-    pub fn set_length(&mut self, length: u32) {
-        self.length = length;
-    }
-
-    pub fn set_progress(&mut self, progress: f32) {
-        self.progress = progress;
     }
 }
 
@@ -47,31 +28,23 @@ impl Widget for &mut Controls {
 
         if track_width > 0.0 {
             if let Some(pointer_pos) = response.interact_pointer_pos() {
-                let relative_x = pointer_pos.x - track_start;
-                let new_progress = (relative_x / track_width).clamp(0.0, 1.0);
+                let new_progress = ((pointer_pos.x - track_start) / track_width).clamp(0.0, 1.0);
 
-                if (new_progress - self.progress).abs() > f32::EPSILON {
-                    self.scrub_progress = Some(new_progress);
+                if new_progress - self.playback.progress_f32() > f32::EPSILON {
+                    self.scrub_progress =
+                        Some((new_progress * self.playback.length() as f32) as u32);
                     response.mark_changed();
                 }
             } else if let Some(scrub_progress) = self.scrub_progress.take() {
                 let _ = self.state.set_progress(scrub_progress);
-                self.progress = scrub_progress;
+                // self.progress = scrub_progress;
                 response.mark_changed();
             }
         }
 
-        let now = Utc::now();
-        let elapsed = now.signed_duration_since(self.last_tick);
-        self.last_tick = now;
-
-        if self.scrub_progress.is_none() && self.length > 0 && self.playing {
-            let step = elapsed.as_seconds_f32() * 1000.0 / self.length as f32;
-            self.progress = (self.progress + step).min(1.0);
-        }
-
         let painter = ui.painter_at(rect);
-        let progress = self.scrub_progress.unwrap_or(self.progress);
+        let progress = self.scrub_progress.unwrap_or(self.playback.progress()) as f32
+            / self.playback.length() as f32;
         let handle_x = track_start + (rect.width() - 2.0 * offset_h) * progress;
 
         painter.rect_filled(
@@ -101,7 +74,7 @@ impl Widget for &mut Controls {
         painter.text(
             Pos2::new(offset_h - 8.0 + rect.left(), rect.center().y),
             Align2::RIGHT_CENTER,
-            ms_to_string((self.length as f32 * progress) as u32),
+            ms_to_string((self.playback.length() as f32 * progress) as u32),
             FontId::new(12.0, FontFamily::Name("lyricsmedium".into())),
             Colour::WHITE.into(),
         );
@@ -109,7 +82,7 @@ impl Widget for &mut Controls {
         painter.text(
             Pos2::new(8.0 - offset_h + rect.right(), rect.center().y),
             Align2::LEFT_CENTER,
-            ms_to_string(self.length),
+            ms_to_string(self.playback.length()),
             FontId::new(12.0, FontFamily::Name("lyricsmedium".into())),
             Colour::WHITE.into(),
         );

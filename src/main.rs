@@ -3,14 +3,18 @@
 mod colour;
 mod layout;
 mod logic;
+mod playback;
 mod state;
 mod ui;
 mod utils;
+
+use std::sync::{Arc, Mutex};
 
 use crate::{
     colour::Colour,
     layout::Layout,
     logic::Logic,
+    playback::Playback,
     state::{AppState, UIEvent, UIState},
     ui::{
         artist::Artist, artwork::Artwork, artwork_controls::ArtworkControls, controls::Controls,
@@ -24,11 +28,14 @@ use eframe::{
     egui::{self, FontData, FontFamily, Spinner},
     epaint::text::{FontInsert, FontPriority, InsertFontFamily},
 };
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::{
+    runtime::{Handle, Runtime},
+    task::JoinHandle,
+};
 
 pub const WINDOW_SIZE: [f32; 2] = [1024.0, 600.0];
 
-struct LyricsApp {
+struct Inner {
     bg: DynamicBg,
     qrcode: QrCode,
     qr_instructions: QrInstructions,
@@ -40,7 +47,12 @@ struct LyricsApp {
     lyrics: Lyrics,
 
     app_state: AppState,
-    state: UIState,
+    // state: UIState,
+    playback: Playback,
+}
+
+struct LyricsApp {
+    inner: Arc<Mutex<Inner>>,
     logic: JoinHandle<Result<()>>,
 }
 
@@ -48,33 +60,55 @@ impl LyricsApp {
     fn new<'a>(
         cc: &'a eframe::CreationContext<'a>,
         state: UIState,
-        logic: JoinHandle<Result<()>>,
+        logic: Logic,
+        handle: &Handle,
     ) -> Result<Self> {
-        let mut this = Self {
+        let playback = Playback::new();
+        let logic = logic.spawn(handle);
+        let mut inner = Inner {
             bg: DynamicBg::new(cc).context("failed to make dynamic bg")?,
             qrcode: QrCode::new(),
             qr_instructions: QrInstructions::new(),
             artwork: Artwork::new(),
-            controls: Controls::new(state.clone()),
+            controls: Controls::new(state.clone(), playback.clone()),
             artwork_controls: ArtworkControls::new(state.clone()),
             title: Title::new(),
             artist: Artist::new(),
-            lyrics: Lyrics::new(),
+            lyrics: Lyrics::new(playback.clone()),
 
             app_state: AppState::Loading,
-            state,
-            logic,
+            // state: state.clone(),
+            playback,
         };
 
-        this.bg.set_colours(vec![
+        inner.bg.set_colours(vec![
             Colour::from_rgb(30, 30, 30),
             Colour::from_rgb(10, 10, 10),
         ]);
 
-        Ok(this)
-    }
+        let inner = Arc::new(Mutex::new(inner));
 
-    fn handle_event(&mut self, event: UIEvent, ui: &mut egui::Ui) {
+        let ctx = cc.egui_ctx.clone();
+        let task_inner = inner.clone();
+        let mut task_state = state;
+        handle.spawn(async move {
+            loop {
+                let event = task_state.wait_event().await;
+                let res = event.and_then(|e| task_inner.lock().unwrap().handle_event(e));
+                if let Err(err) = res {
+                    paris::error!("{err}");
+                }
+
+                ctx.request_repaint();
+            }
+        });
+
+        Ok(Self { inner, logic })
+    }
+}
+
+impl Inner {
+    fn handle_event(&mut self, event: UIEvent) -> Result<()> {
         match event {
             UIEvent::AppStateChanged { app_state } => {
                 self.app_state = app_state;
@@ -90,12 +124,11 @@ impl LyricsApp {
                 length,
             } => {
                 self.artist.set_artist(artist, year);
-                self.controls.set_length(length);
+                self.playback.set_length(length)?;
                 self.title.set_title(title);
             }
             UIEvent::ProgressSync { progress } => {
-                self.controls.set_progress(progress);
-                self.lyrics.set_progress(progress);
+                self.playback.set_progress(progress)?;
             }
             UIEvent::ArtworkChanged {
                 name,
@@ -110,7 +143,7 @@ impl LyricsApp {
             }
             UIEvent::PlayingSync { playing } => {
                 self.artwork_controls.set_playing(playing);
-                self.controls.set_playing(playing);
+                self.playback.set_playing(playing)?;
             }
             UIEvent::ShuffleSync { shuffle } => {
                 self.artwork_controls.set_shuffle(shuffle);
@@ -121,40 +154,36 @@ impl LyricsApp {
             _ => {}
         }
 
-        ui.request_repaint();
+        Ok(())
     }
 }
 
 impl eframe::App for LyricsApp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
-        loop {
-            match self.state.event() {
-                Ok(event) => self.handle_event(event, ui),
-                Err(_) => break,
-            }
-        }
+        let mut guard = self.inner.lock().unwrap();
+        let this = &mut *guard;
 
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE)
             .show(ui, |ui| {
                 let layout = Layout::new(ui.available_rect_before_wrap());
-                ui.add(&mut self.bg);
+                ui.add(&mut this.bg);
 
-                match self.app_state {
+                match this.app_state {
                     AppState::Loading => {
                         Spinner::new().paint_at(ui, layout.spinner);
                     }
                     AppState::Login => {
-                        ui.putc(layout.qrcode, &mut self.qrcode);
-                        ui.putc(layout.qr_instructions, &mut self.qr_instructions);
+                        ui.putc(layout.qrcode, &mut this.qrcode);
+                        ui.putc(layout.qr_instructions, &mut this.qr_instructions);
                     }
                     AppState::Ready => {
-                        ui.putc(layout.artwork, &mut self.artwork);
-                        ui.putc(layout.controls, &mut self.controls);
-                        ui.putc(layout.artwork_controls, &mut self.artwork_controls);
-                        ui.putc(layout.title, &mut self.title);
-                        ui.putc(layout.artist, &mut self.artist);
-                        ui.putc(layout.lyrics, &mut self.lyrics);
+                        ui.putc(layout.artwork, &mut this.artwork);
+                        ui.putc(layout.controls, &mut this.controls);
+                        ui.putc(layout.artwork_controls, &mut this.artwork_controls);
+                        ui.putc(layout.title, &mut this.title);
+                        ui.putc(layout.artist, &mut this.artist);
+                        ui.putc(layout.lyrics, &mut this.lyrics);
                     }
                 }
             });
@@ -225,9 +254,7 @@ fn main() -> eframe::Result {
                 }],
             ));
 
-            let app_state = state.clone();
-            let handle = logic.spawn(runtime.handle());
-            let app = LyricsApp::new(cc, app_state, handle)?;
+            let app = LyricsApp::new(cc, state.clone(), logic, runtime.handle())?;
 
             Ok(Box::new(app))
         }),

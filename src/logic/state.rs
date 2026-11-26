@@ -10,7 +10,7 @@ pub enum SpotifyEvent {
         artist: String,
         year: u32,
         length: u32,
-        progress: f32,
+        progress: u32,
         playing: bool,
     },
 }
@@ -56,7 +56,7 @@ impl SpotifyState {
             .unwrap_or_default();
 
         let length = player_state.duration.max(0) as u32;
-        let position = (cluster.server_timestamp_ms - player_state.timestamp
+        let progress = (cluster.server_timestamp_ms - player_state.timestamp
             + player_state.position_as_of_timestamp) as u32;
 
         let playing = !player_state.is_paused;
@@ -67,7 +67,7 @@ impl SpotifyState {
             artist: artist.to_string(),
             year: 0,
             length,
-            progress: position as f32 / length as f32,
+            progress,
             playing,
         })?;
 

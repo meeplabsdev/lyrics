@@ -33,10 +33,10 @@ pub enum UIEvent {
         length: u32,
     },
     ProgressChanged {
-        progress: f32,
+        progress: u32,
     },
     ProgressSync {
-        progress: f32,
+        progress: u32,
     },
     ArtworkChanged {
         name: String,
@@ -78,6 +78,10 @@ impl UIState {
         let (tx, rx) = broadcast::channel(16);
 
         Self { tx, rx }
+    }
+
+    pub fn has_event(&self) -> bool {
+        !self.rx.is_empty()
     }
 
     pub fn event(&mut self) -> Result<UIEvent> {
@@ -148,22 +152,8 @@ impl UIState {
         Ok(())
     }
 
-    pub fn set_progress(&mut self, progress: f32) -> Result<()> {
-        paris::log!("Set progress to {progress}");
-        self.tx.send(UIEvent::ProgressChanged { progress })?;
-        self.tx.send(UIEvent::ProgressSync { progress })?;
-
-        Ok(())
-    }
-
-    pub fn sync_progress(&mut self, progress: f32) -> Result<()> {
-        paris::log!("Synced progress to {progress}");
-        self.tx.send(UIEvent::ProgressSync { progress })?;
-
-        Ok(())
-    }
-
     pub async fn set_artwork(&mut self, uri: impl Into<String>) -> Result<()> {
+        // TODO: cache
         let uri = uri.into();
 
         let resp = reqwest::get(&uri).await?.error_for_status()?;
@@ -203,6 +193,21 @@ impl UIState {
     pub fn set_lyrics(&mut self, lyrics: Vec<String>) -> Result<()> {
         paris::log!("Set lyrics ({} lines)", lyrics.len());
         self.tx.send(UIEvent::LyricsChanged { lyrics })?;
+
+        Ok(())
+    }
+
+    pub fn set_progress(&mut self, progress: u32) -> Result<()> {
+        paris::log!("Set progress to {progress}");
+        self.tx.send(UIEvent::ProgressChanged { progress })?;
+        self.tx.send(UIEvent::ProgressSync { progress })?;
+
+        Ok(())
+    }
+
+    pub fn sync_progress(&mut self, progress: u32) -> Result<()> {
+        paris::log!("Synced progress to {progress}");
+        self.tx.send(UIEvent::ProgressSync { progress })?;
 
         Ok(())
     }
