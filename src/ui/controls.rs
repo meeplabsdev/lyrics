@@ -3,19 +3,27 @@ use eframe::egui::{Align2, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 
 pub struct Controls {
     state: UIState,
+    playing: bool,
     length: u32,
     progress: f32,
     scrub_progress: Option<f32>,
+    // since_sync: f32,
 }
 
 impl Controls {
     pub fn new(state: UIState) -> Self {
         Self {
             state,
+            playing: false,
             length: 0,
             progress: 0.0,
             scrub_progress: None,
+            // since_sync: 0.0,
         }
+    }
+
+    pub fn set_playing(&mut self, playing: bool) {
+        self.playing = playing;
     }
 
     pub fn set_length(&mut self, length: u32) {
@@ -24,6 +32,7 @@ impl Controls {
 
     pub fn set_progress(&mut self, progress: f32) {
         self.progress = progress;
+        // self.since_sync = 0.0;
     }
 }
 
@@ -50,6 +59,19 @@ impl Widget for &mut Controls {
                 self.progress = scrub_progress;
                 response.mark_changed();
             }
+        }
+
+        if self.scrub_progress.is_none() && self.length > 0 && self.playing {
+            let dt = ui.input(|i| i.stable_dt).min(0.1);
+            // self.since_sync += dt;
+
+            let step = dt * 1000.0 / self.length as f32;
+            self.progress = (self.progress + step).min(1.0);
+
+            // if self.since_sync >= 1.0 {
+            //     self.since_sync -= 1.0;
+            //     let _ = self.state.sync_progress(self.progress);
+            // }
         }
 
         let painter = ui.painter_at(rect);
@@ -83,7 +105,7 @@ impl Widget for &mut Controls {
         painter.text(
             Pos2::new(offset_h - 8.0 + rect.left(), rect.center().y),
             Align2::RIGHT_CENTER,
-            seconds_to_string((self.length as f32 * progress) as u32),
+            ms_to_string((self.length as f32 * progress) as u32),
             FontId::new(12.0, FontFamily::Name("lyricsmedium".into())),
             Colour::WHITE.into(),
         );
@@ -91,7 +113,7 @@ impl Widget for &mut Controls {
         painter.text(
             Pos2::new(8.0 - offset_h + rect.right(), rect.center().y),
             Align2::LEFT_CENTER,
-            seconds_to_string(self.length),
+            ms_to_string(self.length),
             FontId::new(12.0, FontFamily::Name("lyricsmedium".into())),
             Colour::WHITE.into(),
         );
@@ -102,7 +124,8 @@ impl Widget for &mut Controls {
     }
 }
 
-fn seconds_to_string(seconds: u32) -> String {
+fn ms_to_string(millis: u32) -> String {
+    let seconds = millis / 1000;
     let mins = seconds / 60;
     let rem = seconds % 60;
 

@@ -112,6 +112,7 @@ impl LyricsApp {
             }
             UIEvent::PlayingSync { playing } => {
                 self.artwork_controls.set_playing(playing);
+                self.controls.set_playing(playing);
             }
             UIEvent::ShuffleSync { shuffle } => {
                 self.artwork_controls.set_shuffle(shuffle);

@@ -103,13 +103,16 @@ impl Logic {
                 }
                 event = self.spotify_state.wait_event().fuse() => {
                     match event? {
-                        SpotifyEvent::Update { image_url, title } => {
+                        SpotifyEvent::ClusterUpdate { image_url, title, artist, year, length, progress, playing } => {
                             self.ui_state
                                 .set_artwork(image_url)
                                 .await?;
 
                             self.ui_state
-                                .set_track(title, "", 0, 0)?;
+                                .set_track(title, artist, year, length)?;
+
+                            self.ui_state.set_progress(progress)?;
+                            self.ui_state.set_playing(playing)?;
                         }
                     };
                 }

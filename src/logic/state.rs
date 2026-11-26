@@ -1,10 +1,18 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use librespot_protocol::connect::{Cluster, ClusterUpdate};
 use tokio::sync::broadcast;
 
 #[derive(Debug, Clone)]
 pub enum SpotifyEvent {
-    Update { image_url: String, title: String },
+    ClusterUpdate {
+        image_url: String,
+        title: String,
+        artist: String,
+        year: u32,
+        length: u32,
+        progress: f32,
+        playing: bool,
+    },
 }
 
 pub struct SpotifyState {
@@ -33,17 +41,46 @@ impl SpotifyState {
     }
 
     pub async fn set_cluster(&mut self, cluster: Cluster) -> Result<()> {
-        // TODO: take properties and fire events
+        let player_state = cluster.clone().player_state;
+        let metadata = &player_state.track.metadata;
 
-        paris::log!("Got cluster {:#?}", cluster);
+        let image_id = metadata
+            .get("image_url")
+            .and_then(|iu| iu.strip_prefix("spotify:image:"))
+            .unwrap_or_default();
+
+        let title = metadata.get("title").cloned().unwrap_or_default();
+        let artist = metadata
+            .get("artist_uri")
+            .and_then(|iu| iu.strip_prefix("spotify:artist:"))
+            .unwrap_or_default();
+
+        let length = player_state.duration.max(0) as u32;
+        let position = (cluster.server_timestamp_ms - player_state.timestamp
+            + player_state.position_as_of_timestamp) as u32;
+
+        let playing = !player_state.is_paused;
+
+        self.tx.send(SpotifyEvent::ClusterUpdate {
+            image_url: format!("https://i.scdn.co/image/{image_id}"),
+            title,
+            artist: artist.to_string(),
+            year: 0,
+            length,
+            progress: position as f32 / length as f32,
+            playing,
+        })?;
+
+        // paris::log!("Got cluster {:#?}", cluster);
         self.cluster = Some(cluster);
 
         Ok(())
     }
 
-    pub async fn update_cluster(&mut self, update: ClusterUpdate) -> Result<()> {
-        // TODO
-        paris::log!("{update:?}");
+    pub async fn update_cluster(&mut self, mut update: ClusterUpdate) -> Result<()> {
+        // TODO: a better way
+        self.set_cluster(update.cluster.take().context("update had no cluster")?)
+            .await?;
 
         Ok(())
     }
