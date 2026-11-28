@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod colour;
@@ -7,8 +8,6 @@ mod playback;
 mod state;
 mod ui;
 mod utils;
-
-use std::sync::{Arc, Mutex};
 
 use crate::{
     colour::Colour,
@@ -28,6 +27,7 @@ use eframe::{
     egui::{self, FontData, FontFamily, Spinner},
     epaint::text::{FontInsert, FontPriority, InsertFontFamily},
 };
+use std::sync::{Arc, Mutex};
 use tokio::{
     runtime::{Handle, Runtime},
     task::JoinHandle,
