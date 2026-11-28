@@ -2,6 +2,7 @@ use crate::{
     logic::{
         access_token::AccessToken, apresolve::APResolve, device_id::DeviceId, state::SpotifyState,
     },
+    ui::artwork_controls::RepeatMode,
     utils::spotify_id_to_gid,
 };
 use anyhow::{Context, Result, anyhow};
@@ -70,6 +71,30 @@ impl Spotify {
         let initial = this.init_device().await?;
 
         Ok((this, initial))
+    }
+
+    pub async fn set_progress(&self, progress: u32) -> Result<()> {
+        paris::warn!("TODO: set_progress");
+
+        Ok(())
+    }
+
+    pub async fn set_playing(&self, playing: bool) -> Result<()> {
+        paris::warn!("TODO: set_playing");
+
+        Ok(())
+    }
+
+    pub async fn set_shuffle(&self, shuffle: bool) -> Result<()> {
+        paris::warn!("TODO: set_shuffle");
+
+        Ok(())
+    }
+
+    pub async fn set_repeat(&self, repeat: RepeatMode) -> Result<()> {
+        paris::warn!("TODO: set_repeat");
+
+        Ok(())
     }
 
     pub async fn next_track(&self) -> Result<()> {

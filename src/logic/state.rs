@@ -19,7 +19,6 @@ pub enum SpotifyEvent {
 }
 
 pub struct SpotifyState {
-    // cluster: Option<Cluster>,
     spotify: Arc<Spotify>,
     tx: broadcast::Sender<SpotifyEvent>,
     rx: broadcast::Receiver<SpotifyEvent>,
@@ -29,17 +28,8 @@ impl SpotifyState {
     pub fn new(spotify: Arc<Spotify>) -> Self {
         let (tx, rx) = broadcast::channel(16);
 
-        Self {
-            // cluster: None,
-            spotify,
-            tx,
-            rx,
-        }
+        Self { spotify, tx, rx }
     }
-
-    // pub fn event(&mut self) -> Result<SpotifyEvent> {
-    //     Ok(self.rx.try_recv()?)
-    // }
 
     pub async fn wait_event(&mut self) -> Result<SpotifyEvent> {
         Ok(self.rx.recv().await?)
@@ -62,7 +52,6 @@ impl SpotifyState {
 
         let track = self.spotify.fetch_track(track_id.to_string()).await?;
 
-        // let title = metadata.get("title").cloned().unwrap_or_default();
         let title = track.original_title.clone().unwrap_or_default();
 
         let artist = track
@@ -94,9 +83,6 @@ impl SpotifyState {
             playing,
         })?;
 
-        // paris::log!("Got cluster {:#?}", cluster);
-        // self.cluster = Some(cluster);
-
         Ok(())
     }
 
@@ -112,7 +98,6 @@ impl SpotifyState {
 impl Clone for SpotifyState {
     fn clone(&self) -> Self {
         Self {
-            // cluster: self.cluster.clone(),
             spotify: self.spotify.clone(),
             tx: self.tx.clone(),
             rx: self.tx.subscribe(),

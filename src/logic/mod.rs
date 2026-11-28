@@ -94,6 +94,10 @@ impl Logic {
             select! {
                 event = self.ui_state.wait_event().fuse() => {
                     match event? {
+                        UIEvent::ProgressChanged { progress } => spotify.set_progress(progress).await?,
+                        UIEvent::PlayingChanged { playing } => spotify.set_playing(playing).await?,
+                        UIEvent::ShuffleChanged { shuffle } => spotify.set_shuffle(shuffle).await?,
+                        UIEvent::RepeatChanged { repeat } => spotify.set_repeat(repeat).await?,
                         UIEvent::NextTrack => spotify.next_track().await?,
                         UIEvent::PreviousTrack => spotify.prev_track().await?,
                         _ => {}
