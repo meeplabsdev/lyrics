@@ -4,7 +4,7 @@ use eframe::egui::{Align2, FontFamily, FontId, Pos2, Rect, Sense, Vec2, Widget};
 pub struct Controls {
     state: UIState,
     playback: Playback,
-    scrub_progress: Option<u32>,
+    scrub_progress: Option<f32>,
 }
 
 impl Controls {
@@ -31,20 +31,20 @@ impl Widget for &mut Controls {
                 let new_progress = ((pointer_pos.x - track_start) / track_width).clamp(0.0, 1.0);
 
                 if new_progress - self.playback.progress_f32() > f32::EPSILON {
-                    self.scrub_progress =
-                        Some((new_progress * self.playback.length() as f32) as u32);
+                    self.scrub_progress = Some(new_progress);
                     response.mark_changed();
                 }
             } else if let Some(scrub_progress) = self.scrub_progress.take() {
-                let _ = self.state.set_progress(scrub_progress);
+                let _ = self
+                    .state
+                    .set_progress((scrub_progress * self.playback.length() as f32) as u32);
                 // self.progress = scrub_progress;
                 response.mark_changed();
             }
         }
 
         let painter = ui.painter_at(rect);
-        let progress = self.scrub_progress.unwrap_or(self.playback.progress()) as f32
-            / self.playback.length() as f32;
+        let progress = self.scrub_progress.unwrap_or(self.playback.progress_f32());
         let handle_x = track_start + (rect.width() - 2.0 * offset_h) * progress;
 
         painter.rect_filled(
